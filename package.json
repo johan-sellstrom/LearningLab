@@ -1,0 +1,13 @@
+{
+  "name": "privacy-first-id",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Beyond-EUDI demo monorepo: issuer, verifier, OHTTP relay, BBS+ helper, status-list, telemetry",
+  "packageManager": "pnpm@9.7.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel --filter issuer --filter verifier dev",
+    "lint": "echo 'TODO: add lint' && exit 0",
+    "lab:check": "node scripts/lab-check.js"
+  }
+}
