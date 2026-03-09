@@ -29,6 +29,6 @@
 - [x] Add a repo-root .gitignore for local and generated files
 - [x] Verify the .gitignore against the current workspace
 - [x] Commit the .gitignore update
-- [ ] Diagnose the rejected `main` push without losing local edits
-- [ ] Reconcile local `main` with `origin/main` safely
-- [ ] Verify the repaired push flow and upstream tracking
+- [x] Diagnose the rejected `main` push without losing local edits
+- [x] Reconcile local `main` with `origin/main` safely
+- [x] Verify the repaired push flow and upstream tracking
