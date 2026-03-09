@@ -1,0 +1,10 @@
+name = "privacy-gateway-relay-demo"
+main = "src/relay.ts"
+compatibility_date = "2024-05-01"
+
+[vars]
+# Configure environment variables for your relay if needed
+# OHTTP_GATEWAY = "https://gateway.example.com"
+
+[dev]
+port = 8787

@@ -1,0 +1,10 @@
+services:
+  learninglab:
+    build: .
+    ports:
+      - "3001:3001"
+      - "3002:3002"
+    environment:
+      ISSUER_PORT: "3001"
+      VERIFIER_PORT: "3002"
+

@@ -1,0 +1,67 @@
+# GitHub Classroom autograding workflow.
+# This runs the same lab checks students can run locally, but in CI to provide
+# a trusted "pass/fail" signal for GitHub Classroom and the course unlocks.
+name: Classroom Autograding
+
+on:
+  # Manual trigger for instructors (useful for debugging or rerunning a lab).
+  workflow_dispatch:
+    inputs:
+      lab_id:
+        # Optional override for which lab to grade. Preferred control plane is
+        # the LAB_ID repo variable; branch inference remains as a fallback.
+        description: "Optional lab ID (00-05). Preferred source is LAB_ID; branch naming is fallback only."
+        required: false
+        type: string
+  push:
+    # Run on main for the hosted course repo. lab-* branches remain useful as a
+    # developer fallback when testing branch-based inference locally.
+    branches:
+      - main
+      - lab-*
+  pull_request:
+    # PRs are included so instructors can preview changes to labs/workflow.
+    branches:
+      - main
+      - lab-*
+
+jobs:
+  autograde:
+    # ubuntu-latest is used for consistency with GitHub Classroom runners and
+    # for fast, cached setup of Node + pnpm.
+    runs-on: ubuntu-latest
+    # Hard stop so a stuck process does not burn CI minutes.
+    timeout-minutes: 20
+    env:
+      # CI=true helps downstream tooling (pnpm/node) run in non-interactive mode.
+      CI: true
+      # Preferred production control plane: set LAB_ID on the student repo.
+      # Branch inference is kept only as a fallback for local/dev workflows.
+      LAB_ID: ${{ inputs.lab_id || vars.LAB_ID }}
+    steps:
+      - name: Checkout
+        # Pull the student's submission so the lab code is graded as submitted.
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        # Use the pinned pnpm version from packageManager to avoid lockfile drift.
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+
+      - name: Setup Node
+        # Node 20 matches the repo's documented requirement and avoids
+        # differences in crypto/HTTP behavior across versions.
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        # Use the lockfile to ensure deterministic installs for grading.
+        run: pnpm install -r --frozen-lockfile
+
+      - name: Run lab checks
+        # --start ensures issuer/verifier services are started in CI.
+        # --verbose makes failures easier to debug in Classroom logs.
+        run: pnpm lab:check -- --start --verbose

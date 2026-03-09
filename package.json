@@ -1,0 +1,27 @@
+{
+  "name": "privacy-first-id",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Beyond-EUDI demo monorepo: issuer, verifier, OHTTP relay, BBS+ helper, status-list, telemetry",
+  "packageManager": "pnpm@9.7.0",
+  "scripts": {
+    "preinstall": "node scripts/check-node-version.js",
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel --filter issuer --filter verifier dev",
+    "lint": "echo 'TODO: add lint' && exit 0",
+    "lab:check": "pnpm --filter bbs-lib build && node scripts/lab-check.js",
+    "classroom:advance": "node scripts/classroom-advance.js",
+    "classroom:check": "pnpm lab:check -- --start --verbose",
+    "classroom:progress": "node scripts/classroom-progress.js",
+    "classroom:set-lab-id": "node scripts/set-lab-id.js",
+    "classroom:template": "node scripts/scaffold-classroom-template.js --clean",
+    "test:gating": "node --test tests/session-gating.test.mjs",
+    "env:setup": "node scripts/setup-env.js",
+    "env:setup:force": "node scripts/setup-env.js --force"
+  },
+  "pnpm": {
+    "ignoredOptionalDependencies": [
+      "@mattrglobal/node-bbs-signatures"
+    ]
+  }
+}
