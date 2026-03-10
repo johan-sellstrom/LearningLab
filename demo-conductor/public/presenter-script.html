@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LearningLab Presenter Script</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="script-page">
+      <div class="script-shell">
+        <section class="script-card">
+          <p class="eyebrow">Village Run Of Show</p>
+          <h1>Presenter Script</h1>
+          <p class="lede">
+            Use the conductor as a guided assembly of a working privacy stack, not as live coding.
+            The audience should always know what just changed, why it matters, and what to scan after the demo.
+          </p>
+        </section>
+
+        <section class="script-card">
+          <h2>Before The Next Audience Cycle</h2>
+          <ol class="script-list">
+            <li>Press <strong>Hard Reset</strong> in the conductor or use <strong>Shift+R</strong>.</li>
+            <li>Wait for the status banner to return to the ready state.</li>
+            <li>Keep the main conductor on screen and this script on a second tab if needed.</li>
+          </ol>
+        </section>
+
+        <section class="script-card">
+          <h2>Seven Minute Script</h2>
+          <ol class="script-list">
+            <li>
+              <strong>Frame the problem, 20 seconds.</strong>
+              Say: "Most identity demos ask for too much data and expose the relying party directly. This one shows selective disclosure, relay-based fetches, and revocation in one loop."
+            </li>
+            <li>
+              <strong>Start issuer.</strong>
+              Click <strong>Start Issuer</strong>.
+              Say: "Step one is the party that can mint credentials. The metadata and issuance endpoints are live on port 3001."
+            </li>
+            <li>
+              <strong>Start verifier.</strong>
+              Click <strong>Start Verifier</strong>.
+              Say: "Now the relying party is online. At this point the system exists, but it has not issued or checked anything yet."
+            </li>
+            <li>
+              <strong>Issue SD-JWT.</strong>
+              Click <strong>Issue SD-JWT</strong>.
+              Say: "The conductor creates an iProov session, marks it passed in demo mode, requests a credential offer, exchanges a code for a token, mints the credential, and verifies it. The Evidence panel shows every call."
+            </li>
+            <li>
+              <strong>Issue BBS+.</strong>
+              Click <strong>Issue BBS+</strong>.
+              Say: "This time we mint a BBS credential and derive a proof that reveals only one claim. Same trust model, different proof mechanics."
+            </li>
+            <li>
+              <strong>Enable relay.</strong>
+              Click <strong>Enable Relay</strong>.
+              Say: "The verifier restarts with relay mode on. The relying party still works, but now the fetch path is visible in the Relay Traffic panel."
+            </li>
+            <li>
+              <strong>Revoke credential.</strong>
+              Click <strong>Revoke Credential</strong>.
+              Say: "This flips the status-list bit, then immediately re-verifies. The same credential that worked a moment ago is now rejected."
+            </li>
+            <li>
+              <strong>Close with the handoff.</strong>
+              Point to the QR code.
+              Say: "If you want the full project, scan the code, clone the repo, and run the conductor locally."
+            </li>
+          </ol>
+        </section>
+
+        <section class="script-grid">
+          <section class="script-card">
+            <h2>What To Point At</h2>
+            <ul class="script-list">
+              <li>The component cards show what parts of the stack are alive.</li>
+              <li>The Evidence panel shows the exact HTTP requests and responses.</li>
+              <li>The snapshot panels show issuer and verifier debug state after each step.</li>
+              <li>The relay panel is the concrete proof that the fetch path changed.</li>
+            </ul>
+          </section>
+
+          <section class="script-card">
+            <h2>If Something Goes Wrong</h2>
+            <ul class="script-list">
+              <li>Use <strong>Hard Reset</strong> first. It stops child services, clears artifacts, and rewinds the status list.</li>
+              <li>Restart the loop from <strong>Start Issuer</strong>.</li>
+              <li>If Docker was used, keep the browser tab open and rerun <code>docker compose up --build -d</code> from the repo root if needed.</li>
+            </ul>
+          </section>
+        </section>
+
+        <section class="script-card">
+          <h2>Operator Notes</h2>
+          <p class="script-meta">
+            Keep the pace brisk. The goal is not to explain every standard in depth. The goal is to show that the platform is real, staged, inspectable, and reproducible from the repo the audience can scan.
+          </p>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

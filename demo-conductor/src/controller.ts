@@ -5,7 +5,7 @@ import type { Readable } from 'node:stream'
 import type { Request, Response } from 'express'
 import QRCode from 'qrcode'
 import { STEP_DEFS, type StepId } from './steps.js'
-import { createUnsignedProofJwt, isAllowedRelayTarget, resolveRepoUrl, waitFor } from './utils.js'
+import { createAbortError, createUnsignedProofJwt, isAllowedRelayTarget, resolveRepoUrl, throwIfAborted, waitFor } from './utils.js'
 
 type ServiceName = 'issuer' | 'verifier'
 type ServiceMode = 'dev' | 'start'
@@ -94,6 +94,16 @@ type JsonResponse = {
   data: unknown
 }
 
+type ResetOptions = {
+  force?: boolean
+}
+
+type RunContext = {
+  generation: number
+  runKey: number
+  signal: AbortSignal
+}
+
 const MAX_LOGS = 160
 const MAX_EVIDENCE = 40
 const MAX_RELAY_EVENTS = 40
@@ -107,6 +117,9 @@ export class DemoController {
   private readonly relayUrl: string
   private readonly processes: Record<ServiceName, ManagedProcess | null>
   private readonly stepIds: StepId[]
+  private generation = 0
+  private activeRunKey: number | null = null
+  private currentAbortController: AbortController | null = null
   private nextId = 1
   private readonly state: DemoState
 
@@ -163,8 +176,11 @@ export class DemoController {
     return this.state
   }
 
-  async reset() {
-    if (this.state.busy) throw new Error('A step is currently running')
+  async reset(options: ResetOptions = {}) {
+    const force = options.force === true
+    if (this.state.busy && !force) throw new Error('A step is currently running')
+
+    this.invalidateCurrentRun(force ? 'Demo hard reset requested' : 'Demo reset requested')
     await this.stopService('verifier')
     await this.stopService('issuer')
     await this.resetStatusList()
@@ -182,13 +198,16 @@ export class DemoController {
     this.appendEvidence({
       stepId: 'system',
       kind: 'note',
-      title: 'Demo reset',
-      detail: 'Stopped local services, cleared artifacts, and zeroed the status list.'
+      title: force ? 'Hard reset complete' : 'Demo reset',
+      detail: force
+        ? 'Force-stopped local services, cleared artifacts, and zeroed the status list.'
+        : 'Stopped local services, cleared artifacts, and zeroed the status list.'
     })
   }
 
   async runStep(stepId: StepId) {
     if (this.state.busy) throw new Error('Another step is already running')
+    const context = this.createRunContext()
     this.state.busy = true
     this.state.currentStepId = stepId
     this.state.lastError = null
@@ -197,26 +216,28 @@ export class DemoController {
     try {
       switch (stepId) {
         case 'start-issuer':
-          await this.runStartIssuer()
+          await this.runStartIssuer(context)
           break
         case 'start-verifier':
-          await this.runStartVerifier()
+          await this.runStartVerifier(context)
           break
         case 'issue-sd-jwt':
-          await this.runIssueSdJwt()
+          await this.runIssueSdJwt(context)
           break
         case 'issue-bbs':
-          await this.runIssueBbs()
+          await this.runIssueBbs(context)
           break
         case 'enable-relay':
-          await this.runEnableRelay()
+          await this.runEnableRelay(context)
           break
         case 'revoke-credential':
-          await this.runRevokeCredential()
+          await this.runRevokeCredential(context)
           break
       }
+      this.assertRunActive(context)
       this.state.steps[stepId] = 'completed'
     } catch (error: any) {
+      if (this.isRunInvalidated(context)) return
       this.state.steps[stepId] = 'failed'
       this.state.lastError = error?.message || String(error)
       this.appendEvidence({
@@ -227,8 +248,7 @@ export class DemoController {
       })
       throw error
     } finally {
-      this.state.busy = false
-      this.state.currentStepId = null
+      this.releaseRun(context)
     }
   }
 
@@ -308,9 +328,10 @@ export class DemoController {
     }
   }
 
-  private async runStartIssuer() {
-    await this.startService('issuer', this.buildIssuerEnv())
-    await this.captureSnapshots('start-issuer')
+  private async runStartIssuer(context: RunContext) {
+    await this.startService('issuer', this.buildIssuerEnv(), context)
+    await this.captureSnapshots('start-issuer', context)
+    this.assertRunActive(context)
     this.appendEvidence({
       stepId: 'start-issuer',
       kind: 'process',
@@ -319,9 +340,10 @@ export class DemoController {
     })
   }
 
-  private async runStartVerifier() {
-    await this.startService('verifier', this.buildVerifierEnv({ relayEnabled: this.state.relayEnabled }))
-    await this.captureSnapshots('start-verifier')
+  private async runStartVerifier(context: RunContext) {
+    await this.startService('verifier', this.buildVerifierEnv({ relayEnabled: this.state.relayEnabled }), context)
+    await this.captureSnapshots('start-verifier', context)
+    this.assertRunActive(context)
     this.appendEvidence({
       stepId: 'start-verifier',
       kind: 'process',
@@ -330,27 +352,30 @@ export class DemoController {
     })
   }
 
-  private async runIssueSdJwt() {
-    await this.ensureService('issuer')
-    await this.ensureService('verifier')
+  private async runIssueSdJwt(context: RunContext) {
+    await this.ensureService('issuer', context)
+    await this.ensureService('verifier', context)
 
-    const claim = await this.requestJson('issue-sd-jwt', 'Create iProov session', `${ISSUER_BASE_URL}/iproov/claim`)
+    const claim = await this.requestJson(context, 'issue-sd-jwt', 'Create iProov session', `${ISSUER_BASE_URL}/iproov/claim`)
     const claimData = claim.data as Record<string, any>
+    this.assertRunActive(context)
     const session = String(claimData.session)
 
-    await this.requestJson('issue-sd-jwt', 'Mark iProov session passed', `${ISSUER_BASE_URL}/iproov/webhook`, {
+    await this.requestJson(context, 'issue-sd-jwt', 'Mark iProov session passed', `${ISSUER_BASE_URL}/iproov/webhook`, {
       method: 'POST',
       body: { session, signals: { matching: { passed: true } } }
     })
+    this.assertRunActive(context)
 
-    const offer = await this.requestJson('issue-sd-jwt', 'Request SD-JWT offer', `${ISSUER_BASE_URL}/credential-offers`, {
+    const offer = await this.requestJson(context, 'issue-sd-jwt', 'Request SD-JWT offer', `${ISSUER_BASE_URL}/credential-offers`, {
       method: 'POST',
       body: { credentials: ['AgeCredential'] }
     })
     const offerData = offer.data as Record<string, any>
+    this.assertRunActive(context)
     const code = String(offerData.credential_offer.grants['urn:ietf:params:oauth:grant-type:pre-authorized_code']['pre-authorized_code'])
 
-    const token = await this.requestJson('issue-sd-jwt', 'Exchange pre-authorized code', `${ISSUER_BASE_URL}/token`, {
+    const token = await this.requestJson(context, 'issue-sd-jwt', 'Exchange pre-authorized code', `${ISSUER_BASE_URL}/token`, {
       method: 'POST',
       body: {
         grant_type: 'urn:ietf:params:oauth:grant-type:pre-authorized_code',
@@ -358,12 +383,13 @@ export class DemoController {
       }
     })
     const tokenData = token.data as Record<string, any>
+    this.assertRunActive(context)
     const proofJwt = createUnsignedProofJwt({
       nonce: tokenData.c_nonce,
       aud: `${ISSUER_BASE_URL}/credential`
     })
 
-    const credential = await this.requestJson('issue-sd-jwt', 'Mint SD-JWT credential', `${ISSUER_BASE_URL}/credential`, {
+    const credential = await this.requestJson(context, 'issue-sd-jwt', 'Mint SD-JWT credential', `${ISSUER_BASE_URL}/credential`, {
       method: 'POST',
       headers: { authorization: `Bearer ${String(tokenData.access_token)}` },
       body: {
@@ -374,8 +400,9 @@ export class DemoController {
       }
     })
     const credentialData = credential.data as Record<string, any>
+    this.assertRunActive(context)
 
-    const verify = await this.requestJson('issue-sd-jwt', 'Verify SD-JWT credential', `${VERIFIER_BASE_URL}/verify`, {
+    const verify = await this.requestJson(context, 'issue-sd-jwt', 'Verify SD-JWT credential', `${VERIFIER_BASE_URL}/verify`, {
       method: 'POST',
       body: {
         format: 'vc+sd-jwt',
@@ -383,36 +410,40 @@ export class DemoController {
       }
     })
 
+    this.assertRunActive(context)
     this.state.artifacts.sdJwt = {
       session,
       credentialId: String(credentialData.credentialId),
       credential: String(credentialData.credential),
       verify: verify.data
     }
-    await this.captureSnapshots('issue-sd-jwt')
+    await this.captureSnapshots('issue-sd-jwt', context)
   }
 
-  private async runIssueBbs() {
-    await this.ensureService('issuer')
-    await this.ensureService('verifier')
+  private async runIssueBbs(context: RunContext) {
+    await this.ensureService('issuer', context)
+    await this.ensureService('verifier', context)
 
-    const claim = await this.requestJson('issue-bbs', 'Create iProov session', `${ISSUER_BASE_URL}/iproov/claim`)
+    const claim = await this.requestJson(context, 'issue-bbs', 'Create iProov session', `${ISSUER_BASE_URL}/iproov/claim`)
     const claimData = claim.data as Record<string, any>
+    this.assertRunActive(context)
     const session = String(claimData.session)
 
-    await this.requestJson('issue-bbs', 'Mark iProov session passed', `${ISSUER_BASE_URL}/iproov/webhook`, {
+    await this.requestJson(context, 'issue-bbs', 'Mark iProov session passed', `${ISSUER_BASE_URL}/iproov/webhook`, {
       method: 'POST',
       body: { session, signals: { matching: { passed: true } } }
     })
+    this.assertRunActive(context)
 
-    const offer = await this.requestJson('issue-bbs', 'Request BBS offer', `${ISSUER_BASE_URL}/credential-offers`, {
+    const offer = await this.requestJson(context, 'issue-bbs', 'Request BBS offer', `${ISSUER_BASE_URL}/credential-offers`, {
       method: 'POST',
       body: { credentials: ['AgeCredentialBBS'] }
     })
     const offerData = offer.data as Record<string, any>
+    this.assertRunActive(context)
     const code = String(offerData.credential_offer.grants['urn:ietf:params:oauth:grant-type:pre-authorized_code']['pre-authorized_code'])
 
-    const token = await this.requestJson('issue-bbs', 'Exchange pre-authorized code', `${ISSUER_BASE_URL}/token`, {
+    const token = await this.requestJson(context, 'issue-bbs', 'Exchange pre-authorized code', `${ISSUER_BASE_URL}/token`, {
       method: 'POST',
       body: {
         grant_type: 'urn:ietf:params:oauth:grant-type:pre-authorized_code',
@@ -420,12 +451,13 @@ export class DemoController {
       }
     })
     const tokenData = token.data as Record<string, any>
+    this.assertRunActive(context)
     const proofJwt = createUnsignedProofJwt({
       nonce: tokenData.c_nonce,
       aud: `${ISSUER_BASE_URL}/credential`
     })
 
-    const credential = await this.requestJson('issue-bbs', 'Mint BBS credential', `${ISSUER_BASE_URL}/credential`, {
+    const credential = await this.requestJson(context, 'issue-bbs', 'Mint BBS credential', `${ISSUER_BASE_URL}/credential`, {
       method: 'POST',
       headers: { authorization: `Bearer ${String(tokenData.access_token)}` },
       body: {
@@ -436,8 +468,9 @@ export class DemoController {
       }
     })
     const credentialData = credential.data as Record<string, any>
+    this.assertRunActive(context)
 
-    const proof = await this.requestJson('issue-bbs', 'Derive BBS selective-disclosure proof', `${ISSUER_BASE_URL}/bbs/proof`, {
+    const proof = await this.requestJson(context, 'issue-bbs', 'Derive BBS selective-disclosure proof', `${ISSUER_BASE_URL}/bbs/proof`, {
       method: 'POST',
       body: {
         signature: credentialData.signature,
@@ -447,8 +480,9 @@ export class DemoController {
       }
     })
     const proofData = proof.data as Record<string, any>
+    this.assertRunActive(context)
 
-    const verify = await this.requestJson('issue-bbs', 'Verify BBS proof', `${VERIFIER_BASE_URL}/verify`, {
+    const verify = await this.requestJson(context, 'issue-bbs', 'Verify BBS proof', `${VERIFIER_BASE_URL}/verify`, {
       method: 'POST',
       body: {
         format: 'di-bbs',
@@ -461,6 +495,7 @@ export class DemoController {
       }
     })
 
+    this.assertRunActive(context)
     this.state.artifacts.bbs = {
       session,
       credentialId: String(credentialData.credentialId),
@@ -470,39 +505,42 @@ export class DemoController {
       revealedMessages: proofData.revealedMessages as string[],
       verify: verify.data
     }
-    await this.captureSnapshots('issue-bbs')
+    await this.captureSnapshots('issue-bbs', context)
   }
 
-  private async runEnableRelay() {
-    await this.ensureService('issuer')
-    await this.ensureService('verifier')
+  private async runEnableRelay(context: RunContext) {
+    await this.ensureService('issuer', context)
+    await this.ensureService('verifier', context)
     if (!this.state.artifacts.sdJwt) throw new Error('Run the SD-JWT step before enabling the relay')
 
+    this.assertRunActive(context)
     this.state.relayEnabled = true
     this.state.relayEvents = []
-    await this.startService('verifier', this.buildVerifierEnv({ relayEnabled: true }), { restart: true })
+    await this.startService('verifier', this.buildVerifierEnv({ relayEnabled: true }), context, { restart: true })
 
-    await this.requestJson('enable-relay', 'Verify SD-JWT through relay', `${VERIFIER_BASE_URL}/verify`, {
+    await this.requestJson(context, 'enable-relay', 'Verify SD-JWT through relay', `${VERIFIER_BASE_URL}/verify`, {
       method: 'POST',
       body: {
         format: 'vc+sd-jwt',
         credential: this.state.artifacts.sdJwt.credential
       }
     })
-    await this.captureSnapshots('enable-relay')
+    await this.captureSnapshots('enable-relay', context)
   }
 
-  private async runRevokeCredential() {
-    await this.ensureService('issuer')
-    await this.ensureService('verifier')
+  private async runRevokeCredential(context: RunContext) {
+    await this.ensureService('issuer', context)
+    await this.ensureService('verifier', context)
     if (!this.state.artifacts.sdJwt) throw new Error('Run the SD-JWT step before revocation')
 
-    await this.requestJson('revoke-credential', 'Revoke issued credential', `${ISSUER_BASE_URL}/revoke/${this.state.artifacts.sdJwt.credentialId}`, {
+    await this.requestJson(context, 'revoke-credential', 'Revoke issued credential', `${ISSUER_BASE_URL}/revoke/${this.state.artifacts.sdJwt.credentialId}`, {
       method: 'POST',
       headers: { 'x-admin-token': 'change_me' }
     })
+    this.assertRunActive(context)
 
     const verify = await this.requestJson(
+      context,
       'revoke-credential',
       'Re-verify revoked credential',
       `${VERIFIER_BASE_URL}/verify`,
@@ -516,23 +554,24 @@ export class DemoController {
       { expectOk: false }
     )
 
+    this.assertRunActive(context)
     if (verify.ok) {
       throw new Error('Revoked credential still verified successfully')
     }
 
-    await this.captureSnapshots('revoke-credential')
+    await this.captureSnapshots('revoke-credential', context)
   }
 
-  private async ensureService(name: ServiceName) {
+  private async ensureService(name: ServiceName, context: RunContext) {
     if (this.state.services[name].status === 'running') return
     if (name === 'issuer') {
-      await this.startService('issuer', this.buildIssuerEnv())
+      await this.startService('issuer', this.buildIssuerEnv(), context)
     } else {
-      await this.startService('verifier', this.buildVerifierEnv({ relayEnabled: this.state.relayEnabled }))
+      await this.startService('verifier', this.buildVerifierEnv({ relayEnabled: this.state.relayEnabled }), context)
     }
   }
 
-  private async startService(name: ServiceName, env: Record<string, string>, options: { restart?: boolean } = {}) {
+  private async startService(name: ServiceName, env: Record<string, string>, context: RunContext, options: { restart?: boolean } = {}) {
     const current = this.processes[name]
     const currentEnv = JSON.stringify(this.state.services[name].env)
     const nextEnv = JSON.stringify(env)
@@ -578,7 +617,8 @@ export class DemoController {
       this.appendServiceLog(name, 'system', `Process exited with code ${code ?? 'unknown'}`)
     })
 
-    await this.waitForServiceHealth(name)
+    await this.waitForServiceHealth(name, context)
+    this.assertRunActive(context)
     this.state.services[name].status = 'running'
   }
 
@@ -631,14 +671,14 @@ export class DemoController {
     }
   }
 
-  private async waitForServiceHealth(name: ServiceName) {
+  private async waitForServiceHealth(name: ServiceName, context: RunContext) {
     const url = name === 'issuer'
       ? `${ISSUER_BASE_URL}/.well-known/openid-credential-issuer`
       : `${VERIFIER_BASE_URL}/`
 
     await waitFor(async () => {
       try {
-        const response = await fetch(url)
+        const response = await fetch(url, { signal: context.signal })
         if (!response.ok) return false
         return true
       } catch {
@@ -647,17 +687,19 @@ export class DemoController {
     }, {
       timeoutMs: 15_000,
       intervalMs: 250,
-      label: `${name} health`
+      label: `${name} health`,
+      signal: context.signal
     })
   }
 
-  private async captureSnapshots(stepId: StepId) {
+  private async captureSnapshots(stepId: StepId, context: RunContext) {
     const issued = this.state.services.issuer.status === 'running'
-      ? await this.requestJson(stepId, 'Fetch issuer debug state', `${ISSUER_BASE_URL}/debug/issued`, undefined, { expectOk: false })
+      ? await this.requestJson(context, stepId, 'Fetch issuer debug state', `${ISSUER_BASE_URL}/debug/issued`, undefined, { expectOk: false })
       : { data: null }
     const presentation = this.state.services.verifier.status === 'running'
-      ? await this.requestJson(stepId, 'Fetch verifier debug state', `${VERIFIER_BASE_URL}/debug/credential`, undefined, { expectOk: false })
+      ? await this.requestJson(context, stepId, 'Fetch verifier debug state', `${VERIFIER_BASE_URL}/debug/credential`, undefined, { expectOk: false })
       : { data: null }
+    this.assertRunActive(context)
     this.state.snapshots = {
       issued: issued.data,
       presentation: presentation.data
@@ -665,6 +707,7 @@ export class DemoController {
   }
 
   private async requestJson(
+    context: RunContext,
     stepId: StepId,
     title: string,
     url: string,
@@ -685,10 +728,12 @@ export class DemoController {
     const response = await fetch(url, {
       method,
       headers,
-      body: init?.body ? JSON.stringify(init.body) : undefined
+      body: init?.body ? JSON.stringify(init.body) : undefined,
+      signal: context.signal
     })
     const text = await response.text()
     const data = this.parseJson(text)
+    this.assertRunActive(context)
 
     this.appendEvidence({
       stepId,
@@ -775,6 +820,50 @@ export class DemoController {
       encoding: 'utf8'
     })
     return remote.stdout || null
+  }
+
+  private createRunContext(): RunContext {
+    const abortController = new AbortController()
+    const runKey = this.nextId++
+    this.currentAbortController = abortController
+    this.activeRunKey = runKey
+    return {
+      generation: this.generation,
+      runKey,
+      signal: abortController.signal
+    }
+  }
+
+  private invalidateCurrentRun(reason: string) {
+    this.generation += 1
+    this.currentAbortController?.abort(createAbortError(reason))
+    this.currentAbortController = null
+    this.activeRunKey = null
+  }
+
+  private releaseRun(context: RunContext) {
+    if (this.activeRunKey !== context.runKey) return
+    this.currentAbortController = null
+    this.activeRunKey = null
+    this.state.busy = false
+    this.state.currentStepId = null
+  }
+
+  private isRunInvalidated(context: RunContext) {
+    if (context.generation !== this.generation) return true
+    if (this.activeRunKey !== context.runKey) return true
+    try {
+      throwIfAborted(context.signal)
+      return false
+    } catch (error: any) {
+      return error?.name === 'AbortError'
+    }
+  }
+
+  private assertRunActive(context: RunContext) {
+    if (!this.isRunInvalidated(context)) return
+    throwIfAborted(context.signal)
+    throw createAbortError('Demo run invalidated')
   }
 }
 

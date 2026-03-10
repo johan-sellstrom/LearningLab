@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createUnsignedProofJwt, isAllowedRelayTarget, normalizeGitHubUrl, resolveRepoUrl } from '../src/utils.ts'
+import { createUnsignedProofJwt, isAllowedRelayTarget, normalizeGitHubUrl, resolveRepoUrl, waitFor } from '../src/utils.ts'
 
 test('createUnsignedProofJwt encodes a nonce-bearing payload', () => {
   const token = createUnsignedProofJwt({ nonce: 'abc123', aud: 'http://localhost:3001/credential' })
@@ -33,5 +33,19 @@ test('resolveRepoUrl prefers explicit configuration over git metadata', () => {
   assert.equal(
     resolveRepoUrl('', 'git@github.com:advatar/LearningLab.git'),
     'https://github.com/advatar/LearningLab'
+  )
+})
+
+test('waitFor aborts promptly when the signal is cancelled', async () => {
+  const controller = new AbortController()
+  setTimeout(() => controller.abort('stop waiting'), 20)
+
+  await assert.rejects(
+    waitFor(() => false, {
+      intervalMs: 200,
+      timeoutMs: 1_000,
+      signal: controller.signal
+    }),
+    (error: any) => error?.name === 'AbortError'
   )
 })

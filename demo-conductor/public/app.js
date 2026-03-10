@@ -49,7 +49,7 @@ function render() {
     ? `Last error: ${state.lastError}`
     : state.busy
       ? `Running ${humanizeStep(state.currentStepId)}...`
-      : "Ready. Run the next step or reset the whole demo.";
+      : "Ready. Run the next step, or use Hard Reset to rewind the booth to a clean start.";
 }
 
 function renderComponents(state) {
@@ -220,14 +220,33 @@ async function runStep(stepId) {
   }
 }
 
-async function resetDemo() {
-  const response = await fetch("/api/reset", { method: "POST" });
+async function hardResetDemo() {
+  const shouldReset = window.confirm(
+    "Hard reset will stop the local services, clear the artifacts, and rewind the demo to step one."
+  );
+  if (!shouldReset) return;
+
+  const response = await fetch("/api/reset", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({ force: true })
+  });
   const payload = await response.json();
   latestPayload = { ...latestPayload, state: payload.state || latestPayload.state };
   render();
 }
 
-resetButton.addEventListener("click", resetDemo);
+resetButton.addEventListener("click", hardResetDemo);
+
+window.addEventListener("keydown", (event) => {
+  if (!event.shiftKey || event.key.toLowerCase() !== "r") return;
+  event.preventDefault();
+  hardResetDemo().catch((error) => {
+    console.error(error);
+  });
+});
 
 fetchState().catch((error) => {
   statusBanner.textContent = error.message;

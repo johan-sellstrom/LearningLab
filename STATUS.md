@@ -81,3 +81,7 @@
 - [x] Track the course-ops workflow scaffolding
 - [x] Verify the workflow scaffolding locally
 - [x] Commit the workflow scaffolding
+- [x] Add a booth-safe hard reset flow to the demo conductor
+- [x] Verify the hard reset flow locally
+- [x] Add a presenter script for the Village speed-build demo
+- [ ] Commit the booth-readiness updates

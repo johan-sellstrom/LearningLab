@@ -21,9 +21,9 @@ app.get('/api/state', (_req, res) => {
   })
 })
 
-app.post('/api/reset', async (_req, res) => {
+app.post('/api/reset', async (req, res) => {
   try {
-    await controller.reset()
+    await controller.reset({ force: req.body?.force === true })
     res.json({ ok: true, state: controller.getState() })
   } catch (error: any) {
     res.status(400).json({ ok: false, error: error?.message || 'reset_failed' })

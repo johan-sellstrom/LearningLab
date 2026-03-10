@@ -79,7 +79,8 @@ Recommended local launch:
 
 1. Run `pnpm demo:up`
 2. Open `http://localhost:3210`
-3. Run the built-in scenario steps:
+3. Keep `http://localhost:3210/presenter-script.html` open if you want the booth run-of-show in a second tab
+4. Run the built-in scenario steps:
    - Start issuer
    - Start verifier
    - Issue SD-JWT
@@ -100,6 +101,11 @@ Fast development mode:
 - `pnpm demo:conductor`
 
 The conductor starts and restarts issuer/verifier for you, shows the exact HTTP calls and responses, exposes live issuer/verifier debug state, includes a built-in local relay view for the OHTTP story, and renders a QR code to the GitHub repo for the take-home handoff.
+
+Booth operation notes:
+
+- Use the `Presenter Script` link in the conductor header for a local run-of-show page
+- Use `Hard Reset` or `Shift+R` between audience cycles to stop child services, clear artifacts, and zero the status list
 
 ## Lab tracks (step-by-step)
 - Lab 00: labs/README-lab-00-start.md
