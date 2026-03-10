@@ -1,0 +1,36 @@
+course:
+  name: "Learning Lab 2026"
+  slug: "learninglab"
+  timezone: "Europe/Stockholm"
+
+github:
+  owner: "your-github-org"
+  templateOwner: "your-github-org"
+  templateRepo: "learninglab-starter"
+  repoVisibility: "private"
+  workflowFile: "classroom.yml"
+  defaultBranch: "main"
+  addStudentAsCollaborator: true
+  collaboratorPermission: "push"
+  includeAllTemplateBranches: false
+  topics:
+    - "learninglab"
+    - "identity"
+    - "verifiable-credentials"
+
+googleClassroom:
+  courseId: "123456789012345678"
+  defaultState: "DRAFT"
+
+grading:
+  successScorePercent: 100
+  failureScorePercent: 0
+  inProgressScorePercent: 50
+  missingRunScorePercent: 0
+  publishAssignedGrades: false
+
+paths:
+  artifactsDir: "../artifacts"
+
+naming:
+  studentRepoPattern: "{{course.slug}}-{{assignment.slug}}-{{github_username}}"

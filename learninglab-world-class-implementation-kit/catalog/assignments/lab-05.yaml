@@ -1,0 +1,29 @@
+id: "lab-05"
+labId: "05"
+slug: "lab-05-revocation"
+title: "Lab 05 — Privacy-Preserving Revocation (Bitstring Status List)"
+summary: "Embed credential status in issued credentials and have the verifier enforce revocation via a Bitstring Status List."
+studentSteps:
+  - 'Generate and serve a status list.'
+  - 'Allocate a status-list index for each issued credential.'
+  - 'Check revocation in the verifier.'
+  - 'Test revocation and non-revocation cases.'
+
+github:
+  templateRef: "main"
+  repoNamePattern: "{{course.slug}}-{{assignment.slug}}-{{github_username}}"
+  topics:
+    - 'learninglab'
+    - 'lab-05'
+    - 'revocation'
+    - 'status-list'
+
+googleClassroom:
+  workType: "ASSIGNMENT"
+  state: "DRAFT"
+  maxPoints: 100
+  dueDate: "2026-09-15"
+  dueTime: "21:59:00"
+  materials:
+    - title: "Lab handout"
+      url: "https://github.com/your-github-org/learninglab-starter/blob/main/labs/README-lab-05-revocation.md"

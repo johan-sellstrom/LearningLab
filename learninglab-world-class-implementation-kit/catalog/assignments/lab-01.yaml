@@ -1,0 +1,29 @@
+id: "lab-01"
+labId: "01"
+slug: "lab-01-issuance"
+title: "Lab 01 — SD-JWT Issuance (OIDC4VCI)"
+summary: "Implement offer → token → credential for SD-JWT VCs so the verifier can see issued claims."
+studentSteps:
+  - 'Implement `/credential-offers` and `/token` in the issuer.'
+  - 'Require and validate `proof.jwt` with the issuer `c_nonce`.'
+  - 'Issue the SD-JWT and disclosures.'
+  - 'Verify the result end-to-end with the verifier.'
+
+github:
+  templateRef: "main"
+  repoNamePattern: "{{course.slug}}-{{assignment.slug}}-{{github_username}}"
+  topics:
+    - 'learninglab'
+    - 'lab-01'
+    - 'sd-jwt'
+    - 'oid4vci'
+
+googleClassroom:
+  workType: "ASSIGNMENT"
+  state: "DRAFT"
+  maxPoints: 100
+  dueDate: "2026-09-15"
+  dueTime: "21:59:00"
+  materials:
+    - title: "Lab handout"
+      url: "https://github.com/your-github-org/learninglab-starter/blob/main/labs/README-lab-01-issuance.md"

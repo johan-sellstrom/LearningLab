@@ -1,0 +1,29 @@
+id: "lab-02"
+labId: "02"
+slug: "lab-02-bbs"
+title: "Lab 02 — BBS+ Selective Disclosure"
+summary: "Issue DI+BBS credentials and verify unlinkable proofs that reveal only selected claims."
+studentSteps:
+  - 'Add the BBS credential configuration to the issuer.'
+  - 'Issue BBS credentials with a fixed message order.'
+  - 'Expose or use the demo proof helper.'
+  - 'Verify selective-disclosure proofs in the verifier.'
+
+github:
+  templateRef: "main"
+  repoNamePattern: "{{course.slug}}-{{assignment.slug}}-{{github_username}}"
+  topics:
+    - 'learninglab'
+    - 'lab-02'
+    - 'bbs'
+    - 'selective-disclosure'
+
+googleClassroom:
+  workType: "ASSIGNMENT"
+  state: "DRAFT"
+  maxPoints: 100
+  dueDate: "2026-09-15"
+  dueTime: "21:59:00"
+  materials:
+    - title: "Lab handout"
+      url: "https://github.com/your-github-org/learninglab-starter/blob/main/labs/README-lab-02-bbs.md"

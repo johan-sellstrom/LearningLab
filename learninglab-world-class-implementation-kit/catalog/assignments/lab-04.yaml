@@ -1,0 +1,29 @@
+id: "lab-04"
+labId: "04"
+slug: "lab-04-iproov"
+title: "Lab 04 — iProov Liveness Gate"
+summary: "Require a successful iProov verification before releasing credentials or presentations."
+studentSteps:
+  - 'Implement the iProov claim endpoint.'
+  - 'Implement the webhook receiver for the iProov result.'
+  - 'Gate issuance until a passed result is stored.'
+  - 'Test both pass and fail paths.'
+
+github:
+  templateRef: "main"
+  repoNamePattern: "{{course.slug}}-{{assignment.slug}}-{{github_username}}"
+  topics:
+    - 'learninglab'
+    - 'lab-04'
+    - 'iproov'
+    - 'liveness'
+
+googleClassroom:
+  workType: "ASSIGNMENT"
+  state: "DRAFT"
+  maxPoints: 100
+  dueDate: "2026-09-15"
+  dueTime: "21:59:00"
+  materials:
+    - title: "Lab handout"
+      url: "https://github.com/your-github-org/learninglab-starter/blob/main/labs/README-lab-04-iproov.md"

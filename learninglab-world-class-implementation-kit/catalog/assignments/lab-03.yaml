@@ -1,0 +1,29 @@
+id: "lab-03"
+labId: "03"
+slug: "lab-03-ohttp"
+title: "Lab 03 — OHTTP Relay"
+summary: "Route issuer and verifier calls through an OHTTP relay so servers never see client IPs."
+studentSteps:
+  - 'Deploy or point at an OHTTP relay.'
+  - 'Enable relay usage in the issuer.'
+  - 'Enable relay usage in the verifier.'
+  - 'Demonstrate that remote fetches are routed through the relay path.'
+
+github:
+  templateRef: "main"
+  repoNamePattern: "{{course.slug}}-{{assignment.slug}}-{{github_username}}"
+  topics:
+    - 'learninglab'
+    - 'lab-03'
+    - 'ohttp'
+    - 'privacy'
+
+googleClassroom:
+  workType: "ASSIGNMENT"
+  state: "DRAFT"
+  maxPoints: 100
+  dueDate: "2026-09-15"
+  dueTime: "21:59:00"
+  materials:
+    - title: "Lab handout"
+      url: "https://github.com/your-github-org/learninglab-starter/blob/main/labs/README-lab-03-ohttp.md"

@@ -1,0 +1,28 @@
+id: "lab-00"
+labId: "00"
+slug: "lab-00-start"
+title: "Lab 00 — Start (Scaffolding + Health Checks)"
+summary: "Get the scaffold running, env files in place, and verify the expected 501 stubs before coding."
+studentSteps:
+  - 'Run `pnpm env:setup` and `pnpm install -r`.'
+  - 'Start the services with `pnpm dev`.'
+  - 'Verify the issuer metadata endpoint responds.'
+  - 'Confirm the starter endpoints still return `501` until implemented.'
+
+github:
+  templateRef: "main"
+  repoNamePattern: "{{course.slug}}-{{assignment.slug}}-{{github_username}}"
+  topics:
+    - 'learninglab'
+    - 'lab-00'
+    - 'scaffolding'
+
+googleClassroom:
+  workType: "ASSIGNMENT"
+  state: "DRAFT"
+  maxPoints: 100
+  dueDate: "2026-09-15"
+  dueTime: "21:59:00"
+  materials:
+    - title: "Lab handout"
+      url: "https://github.com/your-github-org/learninglab-starter/blob/main/labs/README-lab-00-start.md"

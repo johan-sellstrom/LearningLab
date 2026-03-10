@@ -1,0 +1,25 @@
+{
+  "name": "course-ops",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@9.7.0",
+  "scripts": {
+    "import:google-roster": "node src/cli.mjs import-google-roster",
+    "join:identities": "node src/cli.mjs join-identities",
+    "validate": "node src/cli.mjs validate",
+    "plan": "node src/cli.mjs plan",
+    "provision:github": "node src/cli.mjs provision-github",
+    "progress": "node src/cli.mjs progress",
+    "publish:google": "node src/cli.mjs publish-google",
+    "patch:google": "node src/cli.mjs patch-google",
+    "sync:grades": "node src/cli.mjs sync-grades",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "csv-parse": "^5.5.6",
+    "dotenv": "^16.4.5",
+    "yaml": "^2.5.0",
+    "zod": "^3.23.8"
+  }
+}

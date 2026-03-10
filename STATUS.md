@@ -32,3 +32,29 @@
 - [x] Diagnose the rejected `main` push without losing local edits
 - [x] Reconcile local `main` with `origin/main` safely
 - [x] Verify the repaired push flow and upstream tracking
+- [x] Add Google Classroom roster import to the world-class implementation kit
+- [x] Verify the Google roster import locally
+- [x] Commit the Google roster import
+- [x] Add identity-join tooling to merge Google roster and GitHub usernames
+- [x] Verify the identity-join flow locally
+- [x] Commit the identity-join tooling
+- [x] Update the implementation-kit docs for the Google-first roster flow
+- [x] Commit the roster-flow docs
+- [x] Harden GitHub provisioning so existing repos are verified before reuse
+- [x] Verify the hardened provisioning logic locally
+- [x] Commit the provisioning hardening
+- [x] Add Google Classroom coursework patch support to course-ops
+- [x] Verify create and patch coursework flows locally in dry-run mode
+- [x] Commit the coursework patch support
+- [x] Improve validate and plan outputs for the Google-first roster flow
+- [x] Verify the richer validate and plan outputs locally
+- [x] Commit the validate/plan improvements
+- [x] Make grade sync idempotent and explicit about identity matching
+- [x] Verify the grade-sync decision logic locally
+- [x] Commit the grade-sync improvements
+- [x] Add GitHub progress reporting to the course-ops control plane
+- [x] Verify the progress reporting locally
+- [x] Commit the progress reporting
+- [ ] Add ready-only lab advancement to the course-ops control plane
+- [ ] Verify the advancement flow locally
+- [ ] Commit the advancement flow
