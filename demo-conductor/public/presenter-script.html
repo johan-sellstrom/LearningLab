@@ -40,6 +40,11 @@
               Say: "Step one is the party that can mint credentials. The metadata and issuance endpoints are live on port 3001."
             </li>
             <li>
+              <strong>Run iProov.</strong>
+              If the iProov panel shows a live ceremony is available, click <strong>Start Ceremony</strong> and complete it.
+              Say: "Before the issuer can mint anything, the subject has to pass liveness. In the hosted demo this is a real browser ceremony."
+            </li>
+            <li>
               <strong>Start verifier.</strong>
               Click <strong>Start Verifier</strong>.
               Say: "Now the relying party is online. At this point the system exists, but it has not issued or checked anything yet."
@@ -77,6 +82,7 @@
             <h2>What To Point At</h2>
             <ul class="script-list">
               <li>The component cards show what parts of the stack are alive.</li>
+              <li>The iProov panel shows whether the demo is using a real browser ceremony or the simulated fallback.</li>
               <li>The Evidence panel shows the exact HTTP requests and responses.</li>
               <li>The snapshot panels show issuer and verifier debug state after each step.</li>
               <li>The relay panel is the concrete proof that the fetch path changed.</li>

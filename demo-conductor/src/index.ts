@@ -31,6 +31,24 @@ app.post('/api/reset', async (req, res) => {
   }
 })
 
+app.post('/api/iproov/claim', async (_req, res) => {
+  try {
+    await controller.startIproovCeremony()
+    res.json({ ok: true, state: controller.getState() })
+  } catch (error: any) {
+    res.status(500).json({ ok: false, error: error?.message || 'iproov_claim_failed', state: controller.getState() })
+  }
+})
+
+app.post('/api/iproov/validate', async (_req, res) => {
+  try {
+    await controller.validateIproovCeremony()
+    res.json({ ok: true, state: controller.getState() })
+  } catch (error: any) {
+    res.status(500).json({ ok: false, error: error?.message || 'iproov_validate_failed', state: controller.getState() })
+  }
+})
+
 app.post('/api/steps/:stepId', async (req, res) => {
   const { stepId } = req.params
   if (!isStepId(stepId)) {

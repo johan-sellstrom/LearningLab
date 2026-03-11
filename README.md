@@ -82,6 +82,7 @@ Recommended local launch:
 3. Keep `http://localhost:3210/presenter-script.html` open if you want the booth run-of-show in a second tab
 4. Run the built-in scenario steps:
    - Start issuer
+   - If real iProov credentials are configured, run the iProov ceremony in the dedicated panel
    - Start verifier
    - Issue SD-JWT
    - Issue BBS+
@@ -112,6 +113,9 @@ Booth operation notes:
 
 - Use the `Presenter Script` link in the conductor header for a local run-of-show page
 - Use `Hard Reset` or `Shift+R` between audience cycles to stop child services, clear artifacts, and zero the status list
+- Set `IPROOV_API_KEY` and `IPROOV_SECRET` or `IPROOV_MANAGEMENT_KEY` to unlock the real browser ceremony in the conductor
+- The live iProov web ceremony needs a secure context, so the Railway HTTPS URL is the safest way to run it
+- Without real iProov credentials, the conductor falls back to the simulated callback path used in the earlier demo loop
 
 ## Lab tracks (step-by-step)
 - Lab 00: labs/README-lab-00-start.md

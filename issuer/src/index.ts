@@ -18,6 +18,7 @@ import {
 } from 'jose'
 import { z } from 'zod'
 import { base64ToBytes, bytesToBase64, deriveProof, generateBbsKeypair, signMessages } from 'bbs-lib'
+import { requestVerifyToken, resolveIProovConfig, validateVerifyToken } from './iproov.js'
 
 dotenv.config()
 
@@ -31,7 +32,7 @@ const DEMO_MODE = String(process.env.DEMO_MODE || 'true') !== 'false'
 const STATUS_LIST_ID = process.env.STATUS_LIST_ID || '1'
 const USE_OHTTP = String(process.env.USE_OHTTP || 'false') === 'true'
 const OHTTP_RELAY_URL = process.env.OHTTP_RELAY_URL || ''
-const IPROOV_PASS_TOKEN = process.env.IPROOV_PASS_TOKEN || 'demo-iproov-token'
+const IPROOV = resolveIProovConfig(process.env)
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN?.trim()
 const STATUS_LIST_SIZE_BITS = Number(process.env.STATUS_LIST_SIZE_BITS || 8192)
 const STATUS_LIST_DIR = path.resolve(process.cwd(), '../status-list/data')
@@ -82,6 +83,16 @@ type StatusListState = {
   nextIndex: number
 }
 
+type IProovSessionState = {
+  passed: boolean
+  mode: 'demo' | 'real'
+  userId: string
+  token: string | null
+  validatedAt: string | null
+  failureReason: string | null
+  signals: Record<string, unknown> | null
+}
+
 const credentialsSupported: CredentialConfig[] = [
   {
     id: 'AgeCredential',
@@ -100,7 +111,7 @@ const credentialsSupported: CredentialConfig[] = [
 const offers = new Map<string, CredentialOfferState>()
 const accessTokens = new Map<string, AccessTokenState>()
 const issued: Record<string, IssuedCredential> = {}
-const iproovSessions = new Map<string, { passed: boolean }>()
+const iproovSessions = new Map<string, IProovSessionState>()
 
 const issuerKeys = await createIssuerKeys()
 const bbsKeys = await generateBbsKeypair()
@@ -398,22 +409,134 @@ app.post('/bbs/proof', async (req: Request, res: Response) => {
   }
 })
 
-app.get('/iproov/claim', (_req: Request, res: Response) => {
-  const session = crypto.randomUUID()
-  iproovSessions.set(session, { passed: false })
+app.get('/iproov/config', (_req: Request, res: Response) => {
   res.json({
-    session,
-    token: IPROOV_PASS_TOKEN,
-    streamingURL: `${IPROOV_PASS_TOKEN}:${session}`,
-    note: 'In sandbox, the webhook must mark this session as passed before issuance.'
+    realCeremonyEnabled: IPROOV.realCeremonyEnabled,
+    ceremonyBaseUrl: IPROOV.ceremonyBaseUrl,
+    sdkScriptUrl: IPROOV.sdkScriptUrl,
+    assuranceType: IPROOV.assuranceType,
+    note: IPROOV.realCeremonyEnabled
+      ? 'Launch the real iProov web ceremony and validate the session before issuance.'
+      : 'Configure IPROOV_API_KEY and IPROOV_SECRET or IPROOV_MANAGEMENT_KEY to enable the real web ceremony.'
   })
+})
+
+app.get('/iproov/claim', async (_req: Request, res: Response) => {
+  const session = crypto.randomUUID()
+
+  if (IPROOV.realCeremonyEnabled) {
+    try {
+      const tokenResponse = await requestVerifyToken(IPROOV, { userId: session })
+      iproovSessions.set(session, {
+        passed: false,
+        mode: 'real',
+        userId: session,
+        token: tokenResponse.token,
+        validatedAt: null,
+        failureReason: null,
+        signals: null
+      })
+      return res.json({
+        session,
+        mode: 'real',
+        token: tokenResponse.token,
+        baseUrl: IPROOV.ceremonyBaseUrl,
+        sdkScriptUrl: IPROOV.sdkScriptUrl,
+        note: 'Launch the iProov web SDK, then call /iproov/validate after the ceremony reports passed.'
+      })
+    } catch (error: any) {
+      console.error('[issuer] iProov verify token error', error)
+      return res.status(502).json({
+        error: 'iproov_claim_failed',
+        message: error?.message || 'Unable to create iProov verify token'
+      })
+    }
+  }
+
+  iproovSessions.set(session, {
+    passed: false,
+    mode: 'demo',
+    userId: session,
+    token: null,
+    validatedAt: null,
+    failureReason: null,
+    signals: null
+  })
+  return res.json({
+    session,
+    mode: 'demo',
+    token: IPROOV.passToken,
+    streamingURL: `${IPROOV.passToken}:${session}`,
+    note: 'In demo mode, the webhook must mark this session as passed before issuance.'
+  })
+})
+
+app.post('/iproov/validate', async (req: Request, res: Response) => {
+  const body = z
+    .object({
+      session: z.string()
+    })
+    .parse(req.body || {})
+
+  const sessionState = iproovSessions.get(body.session)
+  if (!sessionState) {
+    return res.status(404).json({ error: 'unknown_session' })
+  }
+  if (sessionState.mode !== 'real' || !sessionState.token) {
+    return res.status(400).json({ error: 'not_real_ceremony', message: 'This session is using demo-mode liveness.' })
+  }
+
+  try {
+    const validation = await validateVerifyToken(IPROOV, {
+      userId: sessionState.userId,
+      token: sessionState.token,
+      ip: '127.0.0.1'
+    })
+    const passed = Boolean(validation.passed)
+    sessionState.passed = passed
+    sessionState.validatedAt = new Date().toISOString()
+    sessionState.failureReason = validation.reason || null
+    sessionState.signals = validation.signals || null
+    iproovSessions.set(body.session, sessionState)
+
+    return res.status(passed ? 200 : 403).json({
+      ok: passed,
+      passed,
+      mode: 'real',
+      validatedAt: sessionState.validatedAt,
+      reason: sessionState.failureReason,
+      assuranceType: validation.assuranceType,
+      type: validation.type,
+      signals: validation.signals || null
+    })
+  } catch (error: any) {
+    sessionState.passed = false
+    sessionState.validatedAt = new Date().toISOString()
+    sessionState.failureReason = error?.message || 'iProov validation failed'
+    sessionState.signals = null
+    iproovSessions.set(body.session, sessionState)
+    console.error('[issuer] iProov validate error', error)
+    return res.status(502).json({
+      error: 'iproov_validate_failed',
+      message: sessionState.failureReason
+    })
+  }
 })
 
 app.post('/iproov/webhook', (req: Request, res: Response) => {
   const { session, signals } = req.body || {}
   if (!session) return res.status(400).json({ error: 'missing_session' })
+  const current = iproovSessions.get(session)
   const passed = Boolean(signals?.matching?.passed)
-  iproovSessions.set(session, { passed })
+  iproovSessions.set(session, {
+    passed,
+    mode: current?.mode || 'demo',
+    userId: current?.userId || session,
+    token: current?.token || null,
+    validatedAt: new Date().toISOString(),
+    failureReason: passed ? null : 'Webhook reported failed liveness',
+    signals: signals && typeof signals === 'object' ? signals : null
+  })
   res.json({ ok: true, passed })
 })
 
@@ -421,7 +544,7 @@ app.listen(PORT, () => {
   console.log(
     `[issuer] listening on ${BASE_URL} (Lab 05: OHTTP ${
       USE_OHTTP && OHTTP_RELAY_URL ? `on via ${OHTTP_RELAY_URL}` : 'off'
-    }, iProov gate ${IPROOV_PASS_TOKEN ? 'enabled' : 'disabled'}, revocation on)`
+    }, iProov ${IPROOV.realCeremonyEnabled ? 'real ceremony enabled' : 'demo gate enabled'}, revocation on)`
   )
 })
 

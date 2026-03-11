@@ -12,6 +12,8 @@ type ServiceMode = 'dev' | 'start'
 type ServiceStatus = 'stopped' | 'starting' | 'running' | 'stopping' | 'error'
 type StepStatus = 'pending' | 'running' | 'completed' | 'failed'
 type EvidenceKind = 'note' | 'process' | 'http' | 'relay'
+type IProovMode = 'demo' | 'real'
+type IProovStatus = 'idle' | 'pending' | 'passed' | 'failed'
 
 type LogEntry = {
   id: number
@@ -77,6 +79,18 @@ type DemoState = {
   repoUrl: string | null
   qrSvg: string | null
   relayEnabled: boolean
+  iproov: {
+    realCeremonyEnabled: boolean
+    sdkScriptUrl: string | null
+    ceremonyBaseUrl: string | null
+    session: string | null
+    token: string | null
+    mode: IProovMode | null
+    status: IProovStatus
+    note: string | null
+    reason: string | null
+    validatedAt: string | null
+  }
   services: Record<ServiceName, ServiceState>
   steps: Record<StepId, StepStatus>
   evidence: EvidenceEntry[]
@@ -110,6 +124,7 @@ const MAX_RELAY_EVENTS = 40
 const ISSUER_BASE_URL = 'http://localhost:3001'
 const VERIFIER_BASE_URL = 'http://localhost:3002'
 const SERVICE_MODE = parseServiceMode(process.env.DEMO_CONDUCTOR_SERVICE_MODE)
+const DEFAULT_IPROOV_SDK_SCRIPT_URL = 'https://cdn.jsdelivr.net/npm/@iproov/web'
 
 export class DemoController {
   private readonly repoRoot: string
@@ -139,6 +154,7 @@ export class DemoController {
       repoUrl: null,
       qrSvg: null,
       relayEnabled: false,
+      iproov: this.createIproovState(),
       services: {
         issuer: this.createServiceState('issuer'),
         verifier: this.createServiceState('verifier')
@@ -190,6 +206,7 @@ export class DemoController {
     this.state.currentStepId = null
     this.state.lastError = null
     this.state.relayEnabled = false
+    this.state.iproov = this.createIproovState()
     this.state.evidence = []
     this.state.relayEvents = []
     this.state.snapshots = { issued: null, presentation: null }
@@ -252,6 +269,75 @@ export class DemoController {
     }
   }
 
+  async startIproovCeremony() {
+    if (this.state.busy) throw new Error('Another step is already running')
+    const context = this.createRunContext()
+    this.state.busy = true
+    this.state.lastError = null
+
+    try {
+      await this.ensureService('issuer', context)
+      const claim = await this.requestJson(context, 'system', 'Create iProov session', `${ISSUER_BASE_URL}/iproov/claim`)
+      this.updateIproovStateFromClaim(claim.data as Record<string, any>)
+      return this.state
+    } catch (error: any) {
+      if (!this.isRunInvalidated(context)) {
+        this.state.lastError = error?.message || String(error)
+      }
+      throw error
+    } finally {
+      this.releaseRun(context)
+    }
+  }
+
+  async validateIproovCeremony() {
+    if (this.state.busy) throw new Error('Another step is already running')
+    if (!this.state.iproov.session) throw new Error('Start an iProov ceremony first')
+    const context = this.createRunContext()
+    this.state.busy = true
+    this.state.lastError = null
+
+    try {
+      await this.ensureService('issuer', context)
+      const validation = await this.requestJson(
+        context,
+        'system',
+        'Validate iProov ceremony',
+        `${ISSUER_BASE_URL}/iproov/validate`,
+        {
+          method: 'POST',
+          body: { session: this.state.iproov.session }
+        },
+        { expectOk: false }
+      )
+
+      const data = (validation.data || {}) as Record<string, any>
+      this.state.iproov.status = validation.ok && data.passed ? 'passed' : 'failed'
+      this.state.iproov.reason = typeof data.reason === 'string'
+        ? data.reason
+        : typeof data.message === 'string'
+          ? data.message
+          : validation.ok
+            ? null
+            : 'iProov validation failed'
+      this.state.iproov.validatedAt = typeof data.validatedAt === 'string' ? data.validatedAt : new Date().toISOString()
+      this.state.iproov.note = validation.ok && data.passed
+        ? 'Live iProov ceremony validated. Issuance is now unlocked.'
+        : this.state.iproov.reason
+
+      return this.state
+    } catch (error: any) {
+      if (!this.isRunInvalidated(context)) {
+        this.state.lastError = error?.message || String(error)
+        this.state.iproov.status = 'failed'
+        this.state.iproov.reason = this.state.lastError
+      }
+      throw error
+    } finally {
+      this.releaseRun(context)
+    }
+  }
+
   async handleRelay(req: Request, res: Response) {
     const target = String(req.query.target || '')
     const allowedOrigins = [ISSUER_BASE_URL, VERIFIER_BASE_URL]
@@ -291,6 +377,24 @@ export class DemoController {
       startedAt: null,
       lastExitCode: null,
       logs: []
+    }
+  }
+
+  private createIproovState(): DemoState['iproov'] {
+    const realCeremonyEnabled = hasRealIproovConfig()
+    return {
+      realCeremonyEnabled,
+      sdkScriptUrl: process.env.IPROOV_SDK_SCRIPT_URL || DEFAULT_IPROOV_SDK_SCRIPT_URL,
+      ceremonyBaseUrl: normalizeIproovCeremonyBaseUrl(process.env.IPROOV_BASE_URL),
+      session: null,
+      token: null,
+      mode: realCeremonyEnabled ? 'real' : 'demo',
+      status: 'idle' as IProovStatus,
+      note: realCeremonyEnabled
+        ? 'Real iProov browser ceremony available.'
+        : 'No real iProov credentials configured. Issuance will use the simulated callback path.',
+      reason: null,
+      validatedAt: null
     }
   }
 
@@ -356,16 +460,7 @@ export class DemoController {
     await this.ensureService('issuer', context)
     await this.ensureService('verifier', context)
 
-    const claim = await this.requestJson(context, 'issue-sd-jwt', 'Create iProov session', `${ISSUER_BASE_URL}/iproov/claim`)
-    const claimData = claim.data as Record<string, any>
-    this.assertRunActive(context)
-    const session = String(claimData.session)
-
-    await this.requestJson(context, 'issue-sd-jwt', 'Mark iProov session passed', `${ISSUER_BASE_URL}/iproov/webhook`, {
-      method: 'POST',
-      body: { session, signals: { matching: { passed: true } } }
-    })
-    this.assertRunActive(context)
+    const session = await this.resolveIproovSession(context, 'issue-sd-jwt')
 
     const offer = await this.requestJson(context, 'issue-sd-jwt', 'Request SD-JWT offer', `${ISSUER_BASE_URL}/credential-offers`, {
       method: 'POST',
@@ -424,16 +519,7 @@ export class DemoController {
     await this.ensureService('issuer', context)
     await this.ensureService('verifier', context)
 
-    const claim = await this.requestJson(context, 'issue-bbs', 'Create iProov session', `${ISSUER_BASE_URL}/iproov/claim`)
-    const claimData = claim.data as Record<string, any>
-    this.assertRunActive(context)
-    const session = String(claimData.session)
-
-    await this.requestJson(context, 'issue-bbs', 'Mark iProov session passed', `${ISSUER_BASE_URL}/iproov/webhook`, {
-      method: 'POST',
-      body: { session, signals: { matching: { passed: true } } }
-    })
-    this.assertRunActive(context)
+    const session = await this.resolveIproovSession(context, 'issue-bbs')
 
     const offer = await this.requestJson(context, 'issue-bbs', 'Request BBS offer', `${ISSUER_BASE_URL}/credential-offers`, {
       method: 'POST',
@@ -708,7 +794,7 @@ export class DemoController {
 
   private async requestJson(
     context: RunContext,
-    stepId: StepId,
+    stepId: StepId | 'system',
     title: string,
     url: string,
     init?: {
@@ -782,7 +868,15 @@ export class DemoController {
       DEMO_MODE: 'true',
       ADMIN_TOKEN: 'change_me',
       USE_OHTTP: 'false',
-      IPROOV_PASS_TOKEN: 'demo-iproov-token'
+      IPROOV_PASS_TOKEN: 'demo-iproov-token',
+      ...(process.env.IPROOV_BASE_URL ? { IPROOV_BASE_URL: process.env.IPROOV_BASE_URL } : {}),
+      ...(process.env.IPROOV_API_KEY ? { IPROOV_API_KEY: process.env.IPROOV_API_KEY } : {}),
+      ...(process.env.IPROOV_SECRET ? { IPROOV_SECRET: process.env.IPROOV_SECRET } : {}),
+      ...(process.env.IPROOV_MANAGEMENT_KEY ? { IPROOV_MANAGEMENT_KEY: process.env.IPROOV_MANAGEMENT_KEY } : {}),
+      ...(process.env.IPROOV_RESOURCE ? { IPROOV_RESOURCE: process.env.IPROOV_RESOURCE } : {}),
+      ...(process.env.IPROOV_CLIENT ? { IPROOV_CLIENT: process.env.IPROOV_CLIENT } : {}),
+      ...(process.env.IPROOV_ASSURANCE_TYPE ? { IPROOV_ASSURANCE_TYPE: process.env.IPROOV_ASSURANCE_TYPE } : {}),
+      ...(process.env.IPROOV_SDK_SCRIPT_URL ? { IPROOV_SDK_SCRIPT_URL: process.env.IPROOV_SDK_SCRIPT_URL } : {})
     }
   }
 
@@ -865,6 +959,66 @@ export class DemoController {
     throwIfAborted(context.signal)
     throw createAbortError('Demo run invalidated')
   }
+
+  private async resolveIproovSession(context: RunContext, stepId: StepId) {
+    if (this.state.iproov.realCeremonyEnabled) {
+      if (!this.state.iproov.session || this.state.iproov.status !== 'passed') {
+        throw new Error('Complete the iProov browser ceremony before issuance')
+      }
+      this.appendEvidence({
+        stepId,
+        kind: 'note',
+        title: 'Using validated iProov session',
+        detail: `Session ${this.state.iproov.session} was validated before issuance.`
+      })
+      return this.state.iproov.session
+    }
+
+    const claim = await this.requestJson(context, stepId, 'Create iProov session', `${ISSUER_BASE_URL}/iproov/claim`)
+    const claimData = claim.data as Record<string, any>
+    this.assertRunActive(context)
+    const session = String(claimData.session)
+
+    await this.requestJson(context, stepId, 'Mark iProov session passed', `${ISSUER_BASE_URL}/iproov/webhook`, {
+      method: 'POST',
+      body: { session, signals: { matching: { passed: true } } }
+    })
+    this.assertRunActive(context)
+
+    this.state.iproov = {
+      ...this.state.iproov,
+      session,
+      token: typeof claimData.token === 'string' ? claimData.token : null,
+      mode: 'demo',
+      status: 'passed',
+      reason: null,
+      validatedAt: new Date().toISOString(),
+      note: 'Simulated iProov callback passed for demo mode.'
+    }
+
+    return session
+  }
+
+  private updateIproovStateFromClaim(data: Record<string, any>) {
+    const mode = data.mode === 'real' ? 'real' : 'demo'
+    this.state.iproov = {
+      ...this.state.iproov,
+      session: typeof data.session === 'string' ? data.session : null,
+      token: typeof data.token === 'string' ? data.token : null,
+      mode,
+      status: 'pending',
+      note: typeof data.note === 'string'
+        ? data.note
+        : mode === 'real'
+          ? 'Launch the real iProov ceremony in the browser and wait for a passed result.'
+          : 'Simulated iProov mode is active.',
+      reason: null,
+      validatedAt: null,
+      ceremonyBaseUrl: typeof data.baseUrl === 'string' ? data.baseUrl : this.state.iproov.ceremonyBaseUrl,
+      sdkScriptUrl: typeof data.sdkScriptUrl === 'string' ? data.sdkScriptUrl : this.state.iproov.sdkScriptUrl,
+      realCeremonyEnabled: mode === 'real'
+    }
+  }
 }
 
 type ManagedProcess = ChildProcessByStdio<null, Readable, Readable>
@@ -893,4 +1047,13 @@ function buildServiceSpec(repoRoot: string, name: ServiceName, mode: ServiceMode
     cwd: repoRoot,
     displayCommand: buildServiceCommand(name, mode)
   }
+}
+
+function hasRealIproovConfig() {
+  return Boolean(process.env.IPROOV_API_KEY && (process.env.IPROOV_SECRET || process.env.IPROOV_MANAGEMENT_KEY))
+}
+
+function normalizeIproovCeremonyBaseUrl(raw: string | undefined) {
+  const base = String(raw || '').trim() || 'https://eu.rp.iproov.me'
+  return base.replace(/\/api\/v2\/?$/, '').replace(/\/+$/, '')
 }

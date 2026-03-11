@@ -12,10 +12,15 @@ const repoLink = document.getElementById("repo-link");
 const repoUrlText = document.getElementById("repo-url-text");
 const qrWrapper = document.getElementById("qr-wrapper");
 const resetButton = document.getElementById("reset-button");
+const iproovBanner = document.getElementById("iproov-banner");
+const iproovMeta = document.getElementById("iproov-meta");
+const iproovMount = document.getElementById("iproov-mount");
+const iproovStartButton = document.getElementById("iproov-start-button");
 
 const componentDefs = [
   { key: "issuer", title: "Issuer", description: "Credential offers, tokens, issuance, iProov gate." },
   { key: "verifier", title: "Verifier", description: "Presentation verification and status checking." },
+  { key: "iproov", title: "iProov", description: "Liveness ceremony before the issuer releases credentials." },
   { key: "relay", title: "Relay", description: "Local privacy relay showing the fetch path." },
   { key: "sdJwt", title: "SD-JWT", description: "Baseline selective disclosure with signed disclosures." },
   { key: "bbs", title: "BBS+", description: "Selective-disclosure proof revealing only one claim." },
@@ -23,6 +28,7 @@ const componentDefs = [
 ];
 
 let latestPayload = null;
+let iproovScriptPromise = null;
 
 async function fetchState() {
   const response = await fetch(stateUrl);
@@ -43,12 +49,13 @@ function render() {
   renderLogs(state);
   renderRelay(state);
   renderSnapshots(state);
+  renderIproov(state);
   renderTakeaway(state);
 
   statusBanner.textContent = state.lastError
     ? `Last error: ${state.lastError}`
     : state.busy
-      ? `Running ${humanizeStep(state.currentStepId)}...`
+      ? `Running ${humanizeActivity(state)}...`
       : "Ready. Run the next step, or use Hard Reset to rewind the booth to a clean start.";
 }
 
@@ -83,6 +90,21 @@ function componentStatus(key, state) {
     return state.relayEnabled
       ? { label: `${state.relayEvents.length} forwarded requests`, className: "active" }
       : { label: "Direct fetches", className: "" };
+  }
+  if (key === "iproov") {
+    if (!state.iproov.realCeremonyEnabled) {
+      return { label: "Simulated callback mode", className: "warning" };
+    }
+    if (state.iproov.status === "passed") {
+      return { label: "Live ceremony passed", className: "running" };
+    }
+    if (state.iproov.status === "pending") {
+      return { label: "Ceremony in progress", className: "active" };
+    }
+    if (state.iproov.status === "failed") {
+      return { label: "Ceremony failed", className: "warning" };
+    }
+    return { label: "Ready to launch", className: "" };
   }
   if (key === "sdJwt") {
     return state.artifacts.sdJwt
@@ -176,6 +198,43 @@ function renderSnapshots(state) {
   presentationSnapshot.textContent = pretty(state.snapshots.presentation);
 }
 
+function renderIproov(state) {
+  const iproov = state.iproov;
+  const canStart = !state.busy && state.services.issuer.status === "running";
+  iproovStartButton.disabled = !canStart;
+  iproovStartButton.textContent = iproov.realCeremonyEnabled
+    ? iproov.status === "pending" && iproov.token
+      ? "Launch Ceremony"
+      : "Start Ceremony"
+    : "Use Simulated Gate";
+
+  iproovBanner.textContent = iproov.reason
+    ? `iProov: ${iproov.reason}`
+    : iproov.note || "Start the issuer first, then launch the liveness ceremony.";
+
+  const metaLines = [
+    `Mode: ${iproov.realCeremonyEnabled ? "real browser ceremony" : "simulated callback"}`,
+    `Session: ${iproov.session || "none"}`,
+    `Status: ${iproov.status}`,
+    iproov.validatedAt ? `Validated: ${iproov.validatedAt}` : null
+  ].filter(Boolean);
+  iproovMeta.innerHTML = metaLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("");
+
+  if (!iproov.realCeremonyEnabled) {
+    iproovMount.innerHTML = `<p class="iproov-placeholder">Real iProov credentials are not configured. The step flow will continue to use the simulated callback path.</p>`;
+    return;
+  }
+
+  if (!window.isSecureContext) {
+    iproovMount.innerHTML = `<p class="iproov-placeholder">The iProov web ceremony requires a secure context. Use the Railway HTTPS URL for the live ceremony.</p>`;
+    return;
+  }
+
+  if (iproov.status === "idle" || !iproov.session) {
+    iproovMount.innerHTML = `<p class="iproov-placeholder">Press Start Ceremony to request a live iProov token and open the capture surface.</p>`;
+  }
+}
+
 function renderTakeaway(state) {
   const repoUrl = state.repoUrl || "Repository URL unavailable";
   repoLink.href = state.repoUrl || "#";
@@ -204,6 +263,10 @@ function escapeHtml(text) {
 function humanizeStep(stepId) {
   const step = latestPayload?.steps?.find((item) => item.id === stepId);
   return step ? step.title : "step";
+}
+
+function humanizeActivity(state) {
+  return state.currentStepId ? humanizeStep(state.currentStepId) : "iProov ceremony";
 }
 
 async function runStep(stepId) {
@@ -238,7 +301,101 @@ async function hardResetDemo() {
   render();
 }
 
+async function startIproovCeremony() {
+  const iproov = latestPayload?.state?.iproov;
+  if (iproov?.realCeremonyEnabled && iproov?.status === "pending" && iproov?.token) {
+    await launchIproovCeremony(iproov);
+    return;
+  }
+
+  const response = await fetch("/api/iproov/claim", { method: "POST" });
+  const payload = await response.json();
+  latestPayload = { ...latestPayload, state: payload.state || latestPayload.state };
+  render();
+  if (!response.ok) {
+    console.error(payload.error || "Unable to start iProov ceremony");
+    return;
+  }
+
+  const nextIproov = latestPayload?.state?.iproov;
+  if (nextIproov?.realCeremonyEnabled && nextIproov?.session && nextIproov?.token) {
+    await launchIproovCeremony(nextIproov);
+  }
+}
+
+async function launchIproovCeremony(iproov) {
+  await ensureIproovSdk(iproov.sdkScriptUrl);
+
+  iproovMount.innerHTML = "";
+  const ceremony = document.createElement("iproov-me");
+  ceremony.setAttribute("token", iproov.token);
+  if (iproov.ceremonyBaseUrl) {
+    ceremony.setAttribute("base_url", iproov.ceremonyBaseUrl);
+  }
+
+  ceremony.addEventListener("passed", () => {
+    iproovBanner.textContent = "iProov reported passed. Validating with the issuer...";
+    validateIproovCeremony().catch((error) => console.error(error));
+  }, { once: true });
+
+  ceremony.addEventListener("failed", (event) => {
+    iproovBanner.textContent = extractIproovEventMessage(event, "iProov reported a failed ceremony.");
+  });
+
+  ceremony.addEventListener("error", (event) => {
+    iproovBanner.textContent = extractIproovEventMessage(event, "The iProov SDK reported an error.");
+  });
+
+  ceremony.addEventListener("canceled", () => {
+    iproovBanner.textContent = "The iProov ceremony was canceled.";
+  });
+
+  iproovMount.appendChild(ceremony);
+}
+
+async function validateIproovCeremony() {
+  const response = await fetch("/api/iproov/validate", { method: "POST" });
+  const payload = await response.json();
+  latestPayload = { ...latestPayload, state: payload.state || latestPayload.state };
+  render();
+  if (!response.ok) {
+    console.error(payload.error || "Unable to validate iProov ceremony");
+  } else {
+    await fetchState();
+  }
+}
+
+function ensureIproovSdk(scriptUrl) {
+  if (customElements.get("iproov-me")) return Promise.resolve();
+  if (iproovScriptPromise) return iproovScriptPromise;
+
+  iproovScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = scriptUrl || "https://cdn.jsdelivr.net/npm/@iproov/web";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load the iProov web SDK"));
+    document.head.appendChild(script);
+  });
+
+  return iproovScriptPromise;
+}
+
+function extractIproovEventMessage(event, fallback) {
+  const detail = event?.detail;
+  if (typeof detail?.message === "string" && detail.message) return detail.message;
+  if (typeof detail?.reason?.message === "string" && detail.reason.message) return detail.reason.message;
+  if (typeof detail?.reason === "string" && detail.reason) return detail.reason;
+  return fallback;
+}
+
 resetButton.addEventListener("click", hardResetDemo);
+iproovStartButton.addEventListener("click", () => {
+  startIproovCeremony().catch((error) => {
+    console.error(error);
+    iproovBanner.textContent = error.message;
+  });
+});
 
 window.addEventListener("keydown", (event) => {
   if (!event.shiftKey || event.key.toLowerCase() !== "r") return;

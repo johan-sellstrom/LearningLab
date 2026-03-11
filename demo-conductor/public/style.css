@@ -218,6 +218,43 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.iproov-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.iproov-meta {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+  color: var(--muted);
+}
+
+.iproov-meta p {
+  margin: 0;
+}
+
+.iproov-mount {
+  min-height: 280px;
+  border-radius: 18px;
+  border: 1px dashed var(--line);
+  background: rgba(247, 240, 229, 0.7);
+  padding: 16px;
+}
+
+.iproov-placeholder {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+iproov-me {
+  display: block;
+  width: 100%;
+  min-height: 420px;
+}
+
 .step-list {
   display: grid;
   gap: 12px;
