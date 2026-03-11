@@ -3,7 +3,7 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "DEMO_CONDUCTOR_SERVICE_MODE=start DEMO_CONDUCTOR_REPO_URL=https://github.com/advatar/LearningLab pnpm --filter demo-conductor start"
+startCommand = "sh -lc 'DEMO_CONDUCTOR_SERVICE_MODE=start DEMO_CONDUCTOR_REPO_URL=https://github.com/advatar/LearningLab pnpm --filter demo-conductor start'"
 healthcheckPath = "/api/state"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
