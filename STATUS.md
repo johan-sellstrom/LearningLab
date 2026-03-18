@@ -97,3 +97,9 @@
 - [x] Verify the real iProov ceremony support locally
 - [x] Commit the iProov ceremony updates
 - [x] Redeploy the iProov ceremony updates to Railway
+- [ ] Assess live GitHub and Google Classroom launch prerequisites from the current workspace
+- [ ] Configure the implementation-kit control plane for the current GitHub template repo
+- [ ] Verify the implementation-kit automation locally
+- [ ] Push the current instructor repo state to GitHub
+- [ ] Execute the live Google Classroom launch flow or capture the external credential blockers precisely
+- [ ] Commit the launch-status updates
