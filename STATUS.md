@@ -104,4 +104,4 @@
 - [x] Provision a pilot GitHub Classroom repo and verify repo-map, progress, and reconcile flows
 - [x] Capture the external GitHub Actions billing blocker on pilot workflow runs
 - [x] Capture the external Google Classroom scope blocker on local gcloud auth
-- [ ] Commit the launch-status updates
+- [x] Commit the launch-status updates
