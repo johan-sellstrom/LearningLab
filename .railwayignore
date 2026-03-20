@@ -1,0 +1,11 @@
+.devcontainer/
+.github/
+AGENTS.md
+README.md
+STATUS.md
+classroom-template/
+learninglab-world-class-implementation-kit/
+labs/
+tests/
+wallet-android/
+wallet-ios/
