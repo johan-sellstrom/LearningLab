@@ -79,15 +79,17 @@ Recommended local launch:
 
 1. Run `pnpm demo:up`
 2. Open `http://localhost:3210`
+   - If `GOOGLE_CLIENT_ID` is set, the conductor will show a Google login screen first
 3. Keep `http://localhost:3210/presenter-script.html` open if you want the booth run-of-show in a second tab
 4. Run the built-in scenario steps:
    - Start issuer
-   - If real iProov credentials are configured, run the iProov ceremony in the dedicated panel
    - Start verifier
    - Issue SD-JWT
+   - Complete iProov
    - Issue BBS+
    - Enable relay
    - Revoke credential
+   - The iProov step launches the live browser ceremony in the workspace when real credentials are configured; otherwise the BBS+ flow uses the simulated callback path
 
 Containerized launch:
 
@@ -102,6 +104,7 @@ Railway deployment:
 - the repo includes [railway.toml](/Users/johansellstrom/dev/iproov/RSA/LearningLab/railway.toml) for a single-service Railway deploy
 - Railway should run the conductor as the public web process while issuer/verifier stay inside the same container as child processes
 - the conductor now honors Railway's injected `PORT`
+- set `DEMO_CONDUCTOR_BASE_URL` to the public HTTPS origin when you enable Google login on Railway
 
 Fast development mode:
 
@@ -112,10 +115,13 @@ The conductor starts and restarts issuer/verifier for you, shows the exact HTTP 
 Booth operation notes:
 
 - Use the `Presenter Script` link in the conductor header for a local run-of-show page
-- Use `Hard Reset` or `Shift+R` between audience cycles to stop child services, clear artifacts, and zero the status list
-- Set `IPROOV_API_KEY` and `IPROOV_SECRET` or `IPROOV_MANAGEMENT_KEY` to unlock the real browser ceremony in the conductor
+- `Reset My Session` or `Shift+R` clears only the signed-in user's artifacts and progress
+- Set `IPROOV_API_KEY` and `IPROOV_SECRET` or `IPROOV_MANAGEMENT_KEY` to unlock the real browser ceremony used before BBS+ disclosure verification
 - The live iProov web ceremony needs a secure context, so the Railway HTTPS URL is the safest way to run it
-- Without real iProov credentials, the conductor falls back to the simulated callback path used in the earlier demo loop
+- Without real iProov credentials, the conductor falls back to the simulated callback path for the BBS+ disclosure flow
+- Set `GOOGLE_CLIENT_ID` to require Google login in the conductor
+- Set `DEMO_CONDUCTOR_AUTH_SECRET` to a stable random secret so signed auth cookies survive restarts cleanly
+- With Google login enabled, each signed-in user gets isolated conductor state, but issuer/verifier child processes and relay mode are still shared singleton resources on the host
 
 ## Lab tracks (step-by-step)
 - Lab 00: labs/README-lab-00-start.md

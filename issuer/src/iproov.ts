@@ -65,14 +65,14 @@ export function normalizeIProovCeremonyBaseUrl(raw: string | undefined) {
   return apiBaseUrl.replace(/\/api\/v2$/, '')
 }
 
-export async function requestVerifyToken(
+export async function requestEnrolToken(
   config: IProovConfig,
   { userId }: { userId: string },
   request: RequestLike = fetch
 ) {
   ensureRealCeremonyEnabled(config)
 
-  const response = await request(`${config.apiBaseUrl}/claim/verify/token`, {
+  const response = await request(`${config.apiBaseUrl}/claim/enrol/token`, {
     method: 'POST',
     headers: {
       accept: 'application/json',
@@ -90,12 +90,12 @@ export async function requestVerifyToken(
 
   const data = await parseJsonResponse(response)
   if (!response.ok) {
-    throw new Error(readIProovError(data) || `iProov verify token request failed with ${response.status}`)
+    throw new Error(readIProovError(data) || `iProov enrol token request failed with ${response.status}`)
   }
 
   const token = typeof data?.token === 'string' ? data.token : ''
   if (!token) {
-    throw new Error('iProov verify token response did not include a token')
+    throw new Error('iProov enrol token response did not include a token')
   }
 
   return {
@@ -104,7 +104,7 @@ export async function requestVerifyToken(
   }
 }
 
-export async function validateVerifyToken(
+export async function validateEnrolToken(
   config: IProovConfig,
   {
     userId,
@@ -115,7 +115,7 @@ export async function validateVerifyToken(
 ): Promise<IProovValidationResult> {
   ensureRealCeremonyEnabled(config)
 
-  const response = await request(`${config.apiBaseUrl}/claim/verify/validate`, {
+  const response = await request(`${config.apiBaseUrl}/claim/enrol/validate`, {
     method: 'POST',
     headers: {
       accept: 'application/json',

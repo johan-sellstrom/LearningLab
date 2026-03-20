@@ -7,7 +7,7 @@ import { DemoController } from '../src/controller.ts'
 
 test('soft reset rejects while a step is running', async () => {
   const repoRoot = await createTempRepoRoot()
-  const controller = new DemoController({ repoRoot, port: 3210 })
+  const controller = new DemoController({ repoRoot, port: 3210, ownerKey: 'user-1' })
   controller.getState().busy = true
 
   await assert.rejects(controller.reset(), /A step is currently running/)
@@ -15,7 +15,7 @@ test('soft reset rejects while a step is running', async () => {
 
 test('force reset clears booth state and rewrites the status list', async () => {
   const repoRoot = await createTempRepoRoot()
-  const controller = new DemoController({ repoRoot, port: 3210 })
+  const controller = new DemoController({ repoRoot, port: 3210, ownerKey: 'user-1' })
   const state = controller.getState()
 
   state.busy = true
@@ -47,7 +47,6 @@ test('force reset clears booth state and rewrites the status list', async () => 
   }
   state.artifacts = {
     sdJwt: {
-      session: 'session-1',
       credentialId: 'cred-1',
       credential: 'token',
       verify: { ok: true }

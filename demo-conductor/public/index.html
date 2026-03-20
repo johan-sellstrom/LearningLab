@@ -3,27 +3,40 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LearningLab Demo Conductor</title>
+    <title>Learning Lab Demo</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
     <main class="page">
       <header class="hero">
-        <div>
-          <p class="eyebrow">Village Speed Build</p>
-          <h1>LearningLab Demo Conductor</h1>
+        <div class="hero-copy">
+          <div class="hero-brand">
+            <img class="hero-logo" src="/brand/Master_iProov_Logo_2024_(White).svg" alt="iProov" />
+            <div>
+              <p class="eyebrow">Privacy-First Identity</p>
+              <h1>Learning Lab Demo</h1>
+            </div>
+          </div>
           <p class="lede">
-            Control the platform build on the laptop, surface the real HTTP calls, and keep the
-            audience focused on what changed at each step.
+            Explore privacy-first identity in action: issue credentials, complete iProov
+            liveness, share only what is needed, and see how relay protection and revocation
+            strengthen trust.
           </p>
         </div>
         <div class="hero-actions">
+          <div class="account-panel">
+            <p class="eyebrow">Signed In</p>
+            <p id="account-name" class="account-name">Loading user...</p>
+            <p id="account-email" class="account-email"></p>
+            <button id="logout-button" class="button button-secondary" type="button">Log Out</button>
+          </div>
           <a class="button button-secondary" href="/presenter-script.html" target="_blank" rel="noreferrer">Presenter Script</a>
-          <button id="reset-button" class="button button-danger" type="button">Hard Reset</button>
+          <button id="reset-button" class="button button-danger" type="button">Reset My Session</button>
           <a id="repo-link" class="button button-primary" href="#" target="_blank" rel="noreferrer">Open Repo</a>
         </div>
       </header>
-      <p class="hero-note">Hard Reset stops child services, clears artifacts, and rewinds the status list for the next audience cycle.</p>
+      <p class="hero-note">Reset My Session clears your credentials and progress for this session while leaving the live services available.</p>
 
       <section class="layout">
         <section class="panel">
@@ -46,31 +59,28 @@
 
         <section class="panel">
           <div class="panel-heading">
-            <h2>iProov Liveness</h2>
-            <p>Run the live ceremony when real iProov credentials are configured.</p>
-          </div>
-          <div id="iproov-banner" class="status-banner"></div>
-          <div id="iproov-meta" class="iproov-meta"></div>
-          <div class="iproov-actions">
-            <button id="iproov-start-button" class="button button-primary" type="button">Start Ceremony</button>
-          </div>
-          <div id="iproov-mount" class="iproov-mount">
-            <p class="iproov-placeholder">The ceremony surface will appear here when a live iProov session starts.</p>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-heading">
             <h2>Scenario Steps</h2>
-            <p>Run the presentation in a fixed order or replay individual moves.</p>
+            <p>Follow the experience in order or revisit any step.</p>
           </div>
           <div id="step-list" class="step-list"></div>
+
+          <div id="iproov-panel" class="step-workspace is-hidden">
+            <div class="step-workspace-heading">
+              <h3>iProov Workspace</h3>
+              <p>When the iProov step is active, the live verification experience appears here.</p>
+            </div>
+            <div id="iproov-banner" class="status-banner"></div>
+            <div id="iproov-meta" class="iproov-meta"></div>
+            <div id="iproov-mount" class="iproov-mount">
+              <p class="iproov-placeholder">The ceremony surface will appear here when a live iProov session starts.</p>
+            </div>
+          </div>
         </section>
 
-        <section class="panel">
+        <section class="panel panel-evidence">
           <div class="panel-heading">
             <h2>Evidence</h2>
-            <p>Every step shows the exact request, response, or process change.</p>
+            <p>See the exact request, response, or system change behind each step.</p>
           </div>
           <div id="status-banner" class="status-banner"></div>
           <div id="evidence-list" class="evidence-list"></div>
@@ -94,7 +104,7 @@
       <footer class="takeaway panel">
         <div>
           <p class="eyebrow">Take It Home</p>
-          <h2>Clone the project after the demo</h2>
+          <h2>Explore the project after the demo</h2>
           <p id="repo-url-text" class="repo-url"></p>
         </div>
         <div id="qr-wrapper" class="qr-wrapper"></div>

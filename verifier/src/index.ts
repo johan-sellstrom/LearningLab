@@ -1,10 +1,11 @@
-// Lab 01: SD-JWT verifier (no BBS, no OHTTP, no iProov yet).
+// Lab 05: SD-JWT + BBS verifier with OHTTP, revocation, and BBS disclosure-time iProov checks.
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import { createHash, randomBytes } from 'node:crypto'
 import { decodeJwt, decodeProtectedHeader, importJWK, jwtVerify } from 'jose'
 import { base64ToBytes, verifyProof as verifyBbsProof } from 'bbs-lib'
+import { assertPassedIProovSession } from './iproov.js'
 
 dotenv.config()
 
@@ -105,14 +106,19 @@ async function verifyBbsPresentation(body: any) {
   if (typeof proofPayload.proof !== 'string' || !Array.isArray(proofPayload.revealedMessages)) {
     throw new Error('invalid_proof')
   }
+  const session = typeof body?.iproov_session === 'string' ? body.iproov_session.trim() : ''
+  if (!session) {
+    throw new Error('Complete the iProov ceremony before verifying the BBS+ disclosure')
+  }
   const nonce = proofPayload.nonce || 'bbs-demo-nonce'
   const publicKey = await fetchBbsPublicKey()
   const ok = await verifyBbsProof(base64ToBytes(proofPayload.proof), publicKey, proofPayload.revealedMessages, nonce)
   if (!ok) throw new Error('bbs_proof_failed')
+  await assertPassedIProovSession(ISSUER_BASE_URL, session, (input, init) => fetchViaRelay(String(input), init))
   if (body.credentialStatus) {
     await ensureNotRevoked(body.credentialStatus)
   }
-  return { revealedMessages: proofPayload.revealedMessages, nonce }
+  return { revealedMessages: proofPayload.revealedMessages, nonce, iproovSession: session }
 }
 
 async function verifySdJwtPresentation(body: any) {

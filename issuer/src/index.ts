@@ -1,4 +1,4 @@
-// Lab 05: SD-JWT + BBS issuer with OHTTP toggle, iProov gating, and Bitstring Status List revocation.
+// Lab 05: SD-JWT + BBS issuer with OHTTP toggle, iProov session state, and Bitstring Status List revocation.
 import express from 'express'
 import type { Request, Response } from 'express'
 import cors from 'cors'
@@ -18,7 +18,7 @@ import {
 } from 'jose'
 import { z } from 'zod'
 import { base64ToBytes, bytesToBase64, deriveProof, generateBbsKeypair, signMessages } from 'bbs-lib'
-import { requestVerifyToken, resolveIProovConfig, validateVerifyToken } from './iproov.js'
+import { requestEnrolToken, resolveIProovConfig, validateEnrolToken } from './iproov.js'
 
 dotenv.config()
 
@@ -252,8 +252,7 @@ app.post('/credential', async (req: Request, res: Response) => {
           proof_type: z.string().optional(),
           jwt: z.string().optional()
         })
-        .optional(),
-      iproov_session: z.string().optional()
+        .optional()
     })
     .parse(req.body || {})
 
@@ -279,15 +278,6 @@ app.post('/credential', async (req: Request, res: Response) => {
     if (aud && aud !== BASE_URL && aud !== `${BASE_URL}/credential`) {
       return res.status(400).json({ error: 'invalid_proof', message: 'audience mismatch' })
     }
-  }
-
-  const iproovSession = body.iproov_session
-  if (!iproovSession) {
-    return res.status(403).json({ error: 'requires_liveness', message: 'iProov session required before issuance' })
-  }
-  const iproovState = iproovSessions.get(iproovSession)
-  if (!iproovState || !iproovState.passed) {
-    return res.status(403).json({ error: 'requires_liveness', message: 'iProov session not passed yet' })
   }
 
   const subject = body.subject || `did:example:${crypto.randomUUID()}`
@@ -416,7 +406,7 @@ app.get('/iproov/config', (_req: Request, res: Response) => {
     sdkScriptUrl: IPROOV.sdkScriptUrl,
     assuranceType: IPROOV.assuranceType,
     note: IPROOV.realCeremonyEnabled
-      ? 'Launch the real iProov web ceremony and validate the session before issuance.'
+      ? 'Launch the real iProov web ceremony and validate the session before the BBS+ disclosure is verified.'
       : 'Configure IPROOV_API_KEY and IPROOV_SECRET or IPROOV_MANAGEMENT_KEY to enable the real web ceremony.'
   })
 })
@@ -426,7 +416,7 @@ app.get('/iproov/claim', async (_req: Request, res: Response) => {
 
   if (IPROOV.realCeremonyEnabled) {
     try {
-      const tokenResponse = await requestVerifyToken(IPROOV, { userId: session })
+      const tokenResponse = await requestEnrolToken(IPROOV, { userId: session })
       iproovSessions.set(session, {
         passed: false,
         mode: 'real',
@@ -442,13 +432,13 @@ app.get('/iproov/claim', async (_req: Request, res: Response) => {
         token: tokenResponse.token,
         baseUrl: IPROOV.ceremonyBaseUrl,
         sdkScriptUrl: IPROOV.sdkScriptUrl,
-        note: 'Launch the iProov web SDK, then call /iproov/validate after the ceremony reports passed.'
+        note: 'Launch the iProov web SDK, then call /iproov/validate before the BBS+ disclosure is verified.'
       })
     } catch (error: any) {
-      console.error('[issuer] iProov verify token error', error)
+      console.error('[issuer] iProov enrol token error', error)
       return res.status(502).json({
         error: 'iproov_claim_failed',
-        message: error?.message || 'Unable to create iProov verify token'
+        message: error?.message || 'Unable to create iProov enrol token'
       })
     }
   }
@@ -467,7 +457,25 @@ app.get('/iproov/claim', async (_req: Request, res: Response) => {
     mode: 'demo',
     token: IPROOV.passToken,
     streamingURL: `${IPROOV.passToken}:${session}`,
-    note: 'In demo mode, the webhook must mark this session as passed before issuance.'
+    note: 'In demo mode, the webhook must mark this session as passed before BBS+ disclosure verification.'
+  })
+})
+
+app.get('/iproov/session/:session', (req: Request, res: Response) => {
+  const { session } = req.params
+  const sessionState = iproovSessions.get(session)
+  if (!sessionState) {
+    return res.status(404).json({ error: 'unknown_session' })
+  }
+
+  return res.json({
+    ok: true,
+    session,
+    passed: sessionState.passed,
+    mode: sessionState.mode,
+    validatedAt: sessionState.validatedAt,
+    reason: sessionState.failureReason,
+    signals: sessionState.signals
   })
 })
 
@@ -487,7 +495,7 @@ app.post('/iproov/validate', async (req: Request, res: Response) => {
   }
 
   try {
-    const validation = await validateVerifyToken(IPROOV, {
+    const validation = await validateEnrolToken(IPROOV, {
       userId: sessionState.userId,
       token: sessionState.token,
       ip: '127.0.0.1'

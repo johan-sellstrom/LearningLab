@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LearningLab Presenter Script</title>
+    <title>Learning Lab Presenter Script</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
@@ -40,11 +41,6 @@
               Say: "Step one is the party that can mint credentials. The metadata and issuance endpoints are live on port 3001."
             </li>
             <li>
-              <strong>Run iProov.</strong>
-              If the iProov panel shows a live ceremony is available, click <strong>Start Ceremony</strong> and complete it.
-              Say: "Before the issuer can mint anything, the subject has to pass liveness. In the hosted demo this is a real browser ceremony."
-            </li>
-            <li>
               <strong>Start verifier.</strong>
               Click <strong>Start Verifier</strong>.
               Say: "Now the relying party is online. At this point the system exists, but it has not issued or checked anything yet."
@@ -52,12 +48,17 @@
             <li>
               <strong>Issue SD-JWT.</strong>
               Click <strong>Issue SD-JWT</strong>.
-              Say: "The conductor creates an iProov session, marks it passed in demo mode, requests a credential offer, exchanges a code for a token, mints the credential, and verifies it. The Evidence panel shows every call."
+              Say: "The conductor requests a credential offer, exchanges a code for a token, mints the credential, and verifies it. The Evidence panel shows every call."
+            </li>
+            <li>
+              <strong>Complete iProov.</strong>
+              Click <strong>Complete iProov</strong>. If the workspace offers a live ceremony, finish it there before continuing.
+              Say: "Before the verifier accepts the BBS proof, the subject has to pass liveness. In the hosted demo this is a real browser ceremony."
             </li>
             <li>
               <strong>Issue BBS+.</strong>
               Click <strong>Issue BBS+</strong>.
-              Say: "This time we mint a BBS credential and derive a proof that reveals only one claim. Same trust model, different proof mechanics."
+              Say: "This time we mint a BBS credential and derive a proof that reveals only one claim. Because liveness already cleared, the verifier accepts the selective-disclosure proof."
             </li>
             <li>
               <strong>Enable relay.</strong>

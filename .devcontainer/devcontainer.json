@@ -1,5 +1,5 @@
 {
-  "name": "LearningLab (Node 20 + pnpm)",
+  "name": "Learning Lab (Node 20 + pnpm)",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
   "postCreateCommand": "corepack enable && corepack prepare pnpm@9.7.0 --activate && pnpm install -r --frozen-lockfile && pnpm env:setup",
   "forwardPorts": [3001, 3002],

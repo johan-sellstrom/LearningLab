@@ -3,9 +3,9 @@ import test from 'node:test'
 import {
   normalizeIProovApiBaseUrl,
   normalizeIProovCeremonyBaseUrl,
-  requestVerifyToken,
+  requestEnrolToken,
   resolveIProovConfig,
-  validateVerifyToken
+  validateEnrolToken
 } from '../src/iproov.ts'
 
 test('resolveIProovConfig normalizes urls and falls back to management key', () => {
@@ -43,7 +43,7 @@ test('normalizeIProov base url helpers accept raw platform or api urls', () => {
   assert.equal(normalizeIProovCeremonyBaseUrl('https://eu.rp.iproov.me/api/v2/'), 'https://eu.rp.iproov.me')
 })
 
-test('requestVerifyToken posts the expected payload', async () => {
+test('requestEnrolToken posts the expected payload', async () => {
   let url = ''
   let body = ''
   const config = resolveIProovConfig({
@@ -51,32 +51,32 @@ test('requestVerifyToken posts the expected payload', async () => {
     IPROOV_SECRET: 'secret-key'
   })
 
-  const response = await requestVerifyToken(config, { userId: 'user-123' }, async (input, init) => {
+  const response = await requestEnrolToken(config, { userId: 'user-123' }, async (input, init) => {
     url = String(input)
     body = String(init?.body || '')
-    return new Response(JSON.stringify({ token: 'verify-token' }), {
+    return new Response(JSON.stringify({ token: 'enrol-token' }), {
       status: 200,
       headers: { 'content-type': 'application/json' }
     })
   })
 
-  assert.equal(url, 'https://eu.rp.iproov.me/api/v2/claim/verify/token')
+  assert.equal(url, 'https://eu.rp.iproov.me/api/v2/claim/enrol/token')
   assert.match(body, /"user_id":"user-123"/)
   assert.match(body, /"assurance_type":"genuine_presence"/)
-  assert.equal(response.token, 'verify-token')
+  assert.equal(response.token, 'enrol-token')
 })
 
-test('validateVerifyToken parses the validation response', async () => {
+test('validateEnrolToken parses the validation response', async () => {
   const config = resolveIProovConfig({
     IPROOV_API_KEY: 'api-key',
     IPROOV_SECRET: 'secret-key'
   })
 
-  const result = await validateVerifyToken(config, { userId: 'user-123', token: 'verify-token', ip: '203.0.113.10' }, async (_input, init) => {
+  const result = await validateEnrolToken(config, { userId: 'user-123', token: 'enrol-token', ip: '203.0.113.10' }, async (_input, init) => {
     assert.match(String(init?.body || ''), /"ip":"203.0.113.10"/)
     return new Response(JSON.stringify({
       passed: true,
-      token: 'verify-token',
+      token: 'enrol-token',
       type: 'genuine_presence',
       assurance_type: 'genuine_presence',
       signals: {

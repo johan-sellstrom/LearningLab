@@ -56,14 +56,13 @@ type SnapshotState = {
 }
 
 type SdArtifact = {
-  session: string
   credentialId: string
   credential: string
   verify: unknown
 }
 
 type BbsArtifact = {
-  session: string
+  iproovSession: string
   credentialId: string
   messages: string[]
   signature: string
@@ -118,6 +117,12 @@ type RunContext = {
   signal: AbortSignal
 }
 
+type SharedRuntime = {
+  relayEnabled: boolean
+  processes: Record<ServiceName, ManagedProcess | null>
+  services: Record<ServiceName, ServiceState>
+}
+
 const MAX_LOGS = 160
 const MAX_EVIDENCE = 40
 const MAX_RELAY_EVENTS = 40
@@ -129,8 +134,9 @@ const DEFAULT_IPROOV_SDK_SCRIPT_URL = 'https://cdn.jsdelivr.net/npm/@iproov/web'
 export class DemoController {
   private readonly repoRoot: string
   private readonly port: number
+  private readonly ownerKey: string
   private readonly relayUrl: string
-  private readonly processes: Record<ServiceName, ManagedProcess | null>
+  private readonly shared: SharedRuntime
   private readonly stepIds: StepId[]
   private generation = 0
   private activeRunKey: number | null = null
@@ -138,26 +144,24 @@ export class DemoController {
   private nextId = 1
   private readonly state: DemoState
 
-  constructor({ repoRoot, port }: { repoRoot: string; port: number }) {
+  constructor({ repoRoot, port, ownerKey }: { repoRoot: string; port: number; ownerKey: string }) {
     this.repoRoot = repoRoot
     this.port = port
+    this.ownerKey = ownerKey
     this.relayUrl = `http://localhost:${port}/relay`
+    this.shared = getSharedRuntime(repoRoot)
     this.stepIds = STEP_DEFS.map((step) => step.id)
-    this.processes = {
-      issuer: null,
-      verifier: null
-    }
     this.state = {
       busy: false,
       currentStepId: null,
       lastError: null,
       repoUrl: null,
       qrSvg: null,
-      relayEnabled: false,
+      relayEnabled: this.shared.relayEnabled,
       iproov: this.createIproovState(),
       services: {
-        issuer: this.createServiceState('issuer'),
-        verifier: this.createServiceState('verifier')
+        issuer: this.shared.services.issuer,
+        verifier: this.shared.services.verifier
       },
       steps: Object.fromEntries(this.stepIds.map((stepId) => [stepId, 'pending'])) as Record<StepId, StepStatus>,
       evidence: [],
@@ -189,6 +193,8 @@ export class DemoController {
   }
 
   getState() {
+    this.state.relayEnabled = this.shared.relayEnabled
+    this.state.services = this.shared.services
     return this.state
   }
 
@@ -197,15 +203,24 @@ export class DemoController {
     if (this.state.busy && !force) throw new Error('A step is currently running')
 
     this.invalidateCurrentRun(force ? 'Demo hard reset requested' : 'Demo reset requested')
-    await this.stopService('verifier')
-    await this.stopService('issuer')
-    await this.resetStatusList()
-    this.state.services.issuer = this.createServiceState('issuer')
-    this.state.services.verifier = this.createServiceState('verifier')
+    if (force) {
+      this.claimSharedActionLock()
+      try {
+        await this.stopService('verifier')
+        await this.stopService('issuer')
+        await this.resetStatusList()
+        this.shared.services.issuer = createSharedServiceState(this.repoRoot, 'issuer')
+        this.shared.services.verifier = createSharedServiceState(this.repoRoot, 'verifier')
+        this.shared.relayEnabled = false
+      } finally {
+        this.releaseSharedActionLock()
+      }
+    }
     this.state.busy = false
     this.state.currentStepId = null
     this.state.lastError = null
-    this.state.relayEnabled = false
+    this.state.relayEnabled = this.shared.relayEnabled
+    this.state.services = this.shared.services
     this.state.iproov = this.createIproovState()
     this.state.evidence = []
     this.state.relayEvents = []
@@ -215,15 +230,16 @@ export class DemoController {
     this.appendEvidence({
       stepId: 'system',
       kind: 'note',
-      title: force ? 'Hard reset complete' : 'Demo reset',
+      title: force ? 'Hard reset complete' : 'Session reset',
       detail: force
-        ? 'Force-stopped local services, cleared artifacts, and zeroed the status list.'
-        : 'Stopped local services, cleared artifacts, and zeroed the status list.'
+        ? 'Force-stopped shared local services, cleared artifacts, and zeroed the status list.'
+        : 'Cleared your demo state. Shared services and relay mode were left as-is for other signed-in users.'
     })
   }
 
   async runStep(stepId: StepId) {
     if (this.state.busy) throw new Error('Another step is already running')
+    this.claimSharedActionLock()
     const context = this.createRunContext()
     this.state.busy = true
     this.state.currentStepId = stepId
@@ -271,12 +287,15 @@ export class DemoController {
 
   async startIproovCeremony() {
     if (this.state.busy) throw new Error('Another step is already running')
+    if (this.state.services.issuer.status !== 'running' || this.state.services.verifier.status !== 'running') {
+      throw new Error('Start the issuer and verifier before running iProov for the BBS+ disclosure')
+    }
+    this.claimSharedActionLock()
     const context = this.createRunContext()
     this.state.busy = true
     this.state.lastError = null
 
     try {
-      await this.ensureService('issuer', context)
       const claim = await this.requestJson(context, 'system', 'Create iProov session', `${ISSUER_BASE_URL}/iproov/claim`)
       this.updateIproovStateFromClaim(claim.data as Record<string, any>)
       return this.state
@@ -293,6 +312,7 @@ export class DemoController {
   async validateIproovCeremony() {
     if (this.state.busy) throw new Error('Another step is already running')
     if (!this.state.iproov.session) throw new Error('Start an iProov ceremony first')
+    this.claimSharedActionLock()
     const context = this.createRunContext()
     this.state.busy = true
     this.state.lastError = null
@@ -322,7 +342,7 @@ export class DemoController {
             : 'iProov validation failed'
       this.state.iproov.validatedAt = typeof data.validatedAt === 'string' ? data.validatedAt : new Date().toISOString()
       this.state.iproov.note = validation.ok && data.passed
-        ? 'Live iProov ceremony validated. Issuance is now unlocked.'
+        ? 'Live iProov ceremony validated and ready for Issue BBS+.'
         : this.state.iproov.reason
 
       return this.state
@@ -391,15 +411,15 @@ export class DemoController {
       mode: realCeremonyEnabled ? 'real' : 'demo',
       status: 'idle' as IProovStatus,
       note: realCeremonyEnabled
-        ? 'Real iProov browser ceremony available.'
-        : 'No real iProov credentials configured. Issuance will use the simulated callback path.',
+        ? 'Real iProov browser ceremony ready. Complete the iProov step before Issue BBS+.'
+        : 'No real iProov credentials configured. The iProov step stays informational and Issue BBS+ uses the simulated callback path.',
       reason: null,
       validatedAt: null
     }
   }
 
   private appendServiceLog(service: ServiceName, stream: LogEntry['stream'], message: string) {
-    const logs = this.state.services[service].logs
+    const logs = this.shared.services[service].logs
     logs.push({
       id: this.nextId++,
       createdAt: new Date().toISOString(),
@@ -445,7 +465,7 @@ export class DemoController {
   }
 
   private async runStartVerifier(context: RunContext) {
-    await this.startService('verifier', this.buildVerifierEnv({ relayEnabled: this.state.relayEnabled }), context)
+    await this.startService('verifier', this.buildVerifierEnv({ relayEnabled: this.shared.relayEnabled }), context)
     await this.captureSnapshots('start-verifier', context)
     this.assertRunActive(context)
     this.appendEvidence({
@@ -459,8 +479,6 @@ export class DemoController {
   private async runIssueSdJwt(context: RunContext) {
     await this.ensureService('issuer', context)
     await this.ensureService('verifier', context)
-
-    const session = await this.resolveIproovSession(context, 'issue-sd-jwt')
 
     const offer = await this.requestJson(context, 'issue-sd-jwt', 'Request SD-JWT offer', `${ISSUER_BASE_URL}/credential-offers`, {
       method: 'POST',
@@ -490,8 +508,7 @@ export class DemoController {
       body: {
         format: 'vc+sd-jwt',
         claims: { age_over: 21, residency: 'SE' },
-        proof: { proof_type: 'jwt', jwt: proofJwt },
-        iproov_session: session
+        proof: { proof_type: 'jwt', jwt: proofJwt }
       }
     })
     const credentialData = credential.data as Record<string, any>
@@ -507,7 +524,6 @@ export class DemoController {
 
     this.assertRunActive(context)
     this.state.artifacts.sdJwt = {
-      session,
       credentialId: String(credentialData.credentialId),
       credential: String(credentialData.credential),
       verify: verify.data
@@ -518,8 +534,6 @@ export class DemoController {
   private async runIssueBbs(context: RunContext) {
     await this.ensureService('issuer', context)
     await this.ensureService('verifier', context)
-
-    const session = await this.resolveIproovSession(context, 'issue-bbs')
 
     const offer = await this.requestJson(context, 'issue-bbs', 'Request BBS offer', `${ISSUER_BASE_URL}/credential-offers`, {
       method: 'POST',
@@ -549,8 +563,7 @@ export class DemoController {
       body: {
         format: 'di-bbs',
         claims: { age_over: 25, residency: 'SE' },
-        proof: { proof_type: 'jwt', jwt: proofJwt },
-        iproov_session: session
+        proof: { proof_type: 'jwt', jwt: proofJwt }
       }
     })
     const credentialData = credential.data as Record<string, any>
@@ -568,6 +581,8 @@ export class DemoController {
     const proofData = proof.data as Record<string, any>
     this.assertRunActive(context)
 
+    const session = await this.resolveIproovSession(context, 'issue-bbs')
+
     const verify = await this.requestJson(context, 'issue-bbs', 'Verify BBS proof', `${VERIFIER_BASE_URL}/verify`, {
       method: 'POST',
       body: {
@@ -577,13 +592,14 @@ export class DemoController {
           revealedMessages: proofData.revealedMessages,
           nonce: proofData.nonce
         },
-        credentialStatus: credentialData.credentialStatus
+        credentialStatus: credentialData.credentialStatus,
+        iproov_session: session
       }
     })
 
     this.assertRunActive(context)
     this.state.artifacts.bbs = {
-      session,
+      iproovSession: session,
       credentialId: String(credentialData.credentialId),
       messages: credentialData.messages as string[],
       signature: String(credentialData.signature),
@@ -600,7 +616,7 @@ export class DemoController {
     if (!this.state.artifacts.sdJwt) throw new Error('Run the SD-JWT step before enabling the relay')
 
     this.assertRunActive(context)
-    this.state.relayEnabled = true
+    this.shared.relayEnabled = true
     this.state.relayEvents = []
     await this.startService('verifier', this.buildVerifierEnv({ relayEnabled: true }), context, { restart: true })
 
@@ -649,19 +665,19 @@ export class DemoController {
   }
 
   private async ensureService(name: ServiceName, context: RunContext) {
-    if (this.state.services[name].status === 'running') return
+    if (this.shared.services[name].status === 'running') return
     if (name === 'issuer') {
       await this.startService('issuer', this.buildIssuerEnv(), context)
     } else {
-      await this.startService('verifier', this.buildVerifierEnv({ relayEnabled: this.state.relayEnabled }), context)
+      await this.startService('verifier', this.buildVerifierEnv({ relayEnabled: this.shared.relayEnabled }), context)
     }
   }
 
   private async startService(name: ServiceName, env: Record<string, string>, context: RunContext, options: { restart?: boolean } = {}) {
-    const current = this.processes[name]
-    const currentEnv = JSON.stringify(this.state.services[name].env)
+    const current = this.shared.processes[name]
+    const currentEnv = JSON.stringify(this.shared.services[name].env)
     const nextEnv = JSON.stringify(env)
-    if (current && this.state.services[name].status === 'running' && currentEnv === nextEnv && !options.restart) {
+    if (current && this.shared.services[name].status === 'running' && currentEnv === nextEnv && !options.restart) {
       return
     }
 
@@ -680,32 +696,32 @@ export class DemoController {
       stdio: ['ignore', 'pipe', 'pipe']
     })
 
-    this.processes[name] = child
-    this.state.services[name].status = 'starting'
-    this.state.services[name].pid = child.pid ?? null
-    this.state.services[name].env = env
-    this.state.services[name].startedAt = new Date().toISOString()
-    this.state.services[name].lastExitCode = null
+    this.shared.processes[name] = child
+    this.shared.services[name].status = 'starting'
+    this.shared.services[name].pid = child.pid ?? null
+    this.shared.services[name].env = env
+    this.shared.services[name].startedAt = new Date().toISOString()
+    this.shared.services[name].lastExitCode = null
     this.appendEvidence({
       stepId: 'system',
       kind: 'process',
       title: `Started ${name}`,
-      detail: `${this.state.services[name].command} (${name === 'verifier' && this.state.relayEnabled ? 'relay on' : 'relay off'})`
+      detail: `${this.shared.services[name].command} (${name === 'verifier' && this.shared.relayEnabled ? 'relay on' : 'relay off'})`
     })
 
     this.attachProcessLogs(name, child)
 
     child.on('exit', (code) => {
-      this.processes[name] = null
-      this.state.services[name].status = code === 0 ? 'stopped' : 'error'
-      this.state.services[name].pid = null
-      this.state.services[name].lastExitCode = code
+      this.shared.processes[name] = null
+      this.shared.services[name].status = code === 0 ? 'stopped' : 'error'
+      this.shared.services[name].pid = null
+      this.shared.services[name].lastExitCode = code
       this.appendServiceLog(name, 'system', `Process exited with code ${code ?? 'unknown'}`)
     })
 
     await this.waitForServiceHealth(name, context)
     this.assertRunActive(context)
-    this.state.services[name].status = 'running'
+    this.shared.services[name].status = 'running'
   }
 
   private attachProcessLogs(name: ServiceName, child: ManagedProcess) {
@@ -732,24 +748,24 @@ export class DemoController {
   }
 
   private async stopService(name: ServiceName) {
-    const child = this.processes[name]
+    const child = this.shared.processes[name]
     if (!child) {
-      this.state.services[name].status = 'stopped'
-      this.state.services[name].pid = null
+      this.shared.services[name].status = 'stopped'
+      this.shared.services[name].pid = null
       return
     }
 
-    this.state.services[name].status = 'stopping'
+    this.shared.services[name].status = 'stopping'
     child.kill('SIGTERM')
     try {
-      await waitFor(() => !this.processes[name], {
+      await waitFor(() => !this.shared.processes[name], {
         timeoutMs: 4_000,
         intervalMs: 100,
         label: `${name} to stop`
       })
     } catch {
       child.kill('SIGKILL')
-      await waitFor(() => !this.processes[name], {
+      await waitFor(() => !this.shared.processes[name], {
         timeoutMs: 2_000,
         intervalMs: 100,
         label: `${name} to force-stop`
@@ -779,10 +795,10 @@ export class DemoController {
   }
 
   private async captureSnapshots(stepId: StepId, context: RunContext) {
-    const issued = this.state.services.issuer.status === 'running'
+    const issued = this.shared.services.issuer.status === 'running'
       ? await this.requestJson(context, stepId, 'Fetch issuer debug state', `${ISSUER_BASE_URL}/debug/issued`, undefined, { expectOk: false })
       : { data: null }
-    const presentation = this.state.services.verifier.status === 'running'
+    const presentation = this.shared.services.verifier.status === 'running'
       ? await this.requestJson(context, stepId, 'Fetch verifier debug state', `${VERIFIER_BASE_URL}/debug/credential`, undefined, { expectOk: false })
       : { data: null }
     this.assertRunActive(context)
@@ -941,6 +957,7 @@ export class DemoController {
     this.activeRunKey = null
     this.state.busy = false
     this.state.currentStepId = null
+    this.releaseSharedActionLock()
   }
 
   private isRunInvalidated(context: RunContext) {
@@ -963,13 +980,13 @@ export class DemoController {
   private async resolveIproovSession(context: RunContext, stepId: StepId) {
     if (this.state.iproov.realCeremonyEnabled) {
       if (!this.state.iproov.session || this.state.iproov.status !== 'passed') {
-        throw new Error('Complete the iProov browser ceremony before issuance')
+        throw new Error('Complete the iProov browser ceremony before the BBS+ disclosure is verified')
       }
       this.appendEvidence({
         stepId,
         kind: 'note',
         title: 'Using validated iProov session',
-        detail: `Session ${this.state.iproov.session} was validated before issuance.`
+        detail: `Session ${this.state.iproov.session} belongs to the signed-in user and is ready for BBS+ disclosure verification.`
       })
       return this.state.iproov.session
     }
@@ -993,7 +1010,7 @@ export class DemoController {
       status: 'passed',
       reason: null,
       validatedAt: new Date().toISOString(),
-      note: 'Simulated iProov callback passed for demo mode.'
+      note: 'Simulated iProov callback passed for the BBS+ disclosure demo.'
     }
 
     return session
@@ -1010,8 +1027,8 @@ export class DemoController {
       note: typeof data.note === 'string'
         ? data.note
         : mode === 'real'
-          ? 'Launch the real iProov ceremony in the browser and wait for a passed result.'
-          : 'Simulated iProov mode is active.',
+          ? 'Launch the real iProov ceremony in the browser, then return to Issue BBS+.'
+          : 'Simulated iProov mode is active. Issue BBS+ will mark the callback passed.',
       reason: null,
       validatedAt: null,
       ceremonyBaseUrl: typeof data.baseUrl === 'string' ? data.baseUrl : this.state.iproov.ceremonyBaseUrl,
@@ -1019,9 +1036,29 @@ export class DemoController {
       realCeremonyEnabled: mode === 'real'
     }
   }
+
+  private claimSharedActionLock() {
+    if (sharedActionOwnerKey && sharedActionOwnerKey !== this.ownerKey) {
+      throw new Error('Another signed-in user is currently running a demo action')
+    }
+    sharedActionOwnerKey = this.ownerKey
+  }
+
+  private releaseSharedActionLock() {
+    if (sharedActionOwnerKey === this.ownerKey) {
+      sharedActionOwnerKey = null
+    }
+  }
 }
 
 type ManagedProcess = ChildProcessByStdio<null, Readable, Readable>
+
+let sharedRuntime: SharedRuntime | null = null
+let sharedActionOwnerKey: string | null = null
+
+export function getSharedActionOwnerKey() {
+  return sharedActionOwnerKey
+}
 
 function buildServiceCommand(name: ServiceName, mode: ServiceMode) {
   return `pnpm --filter ${name} ${mode}`
@@ -1056,4 +1093,32 @@ function hasRealIproovConfig() {
 function normalizeIproovCeremonyBaseUrl(raw: string | undefined) {
   const base = String(raw || '').trim() || 'https://eu.rp.iproov.me'
   return base.replace(/\/api\/v2\/?$/, '').replace(/\/+$/, '')
+}
+
+function getSharedRuntime(repoRoot: string): SharedRuntime {
+  if (sharedRuntime) return sharedRuntime
+  sharedRuntime = {
+    relayEnabled: false,
+    processes: {
+      issuer: null,
+      verifier: null
+    },
+    services: {
+      issuer: createSharedServiceState(repoRoot, 'issuer'),
+      verifier: createSharedServiceState(repoRoot, 'verifier')
+    }
+  }
+  return sharedRuntime
+}
+
+function createSharedServiceState(repoRoot: string, name: ServiceName): ServiceState {
+  return {
+    status: 'stopped',
+    pid: null,
+    command: buildServiceSpec(repoRoot, name, SERVICE_MODE).displayCommand,
+    env: {},
+    startedAt: null,
+    lastExitCode: null,
+    logs: []
+  }
 }

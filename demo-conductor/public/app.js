@@ -12,15 +12,23 @@ const repoLink = document.getElementById("repo-link");
 const repoUrlText = document.getElementById("repo-url-text");
 const qrWrapper = document.getElementById("qr-wrapper");
 const resetButton = document.getElementById("reset-button");
+const logoutButton = document.getElementById("logout-button");
+const accountName = document.getElementById("account-name");
+const accountEmail = document.getElementById("account-email");
+const iproovPanel = document.getElementById("iproov-panel");
 const iproovBanner = document.getElementById("iproov-banner");
 const iproovMeta = document.getElementById("iproov-meta");
 const iproovMount = document.getElementById("iproov-mount");
-const iproovStartButton = document.getElementById("iproov-start-button");
+const iproovScenarioStep = {
+  id: "run-iproov",
+  title: "Complete iProov",
+  summary: "Run the liveness ceremony before Issue BBS+ verifies the selective-disclosure proof."
+};
 
 const componentDefs = [
-  { key: "issuer", title: "Issuer", description: "Credential offers, tokens, issuance, iProov gate." },
+  { key: "issuer", title: "Issuer", description: "Credential offers, tokens, issuance, and iProov session state." },
   { key: "verifier", title: "Verifier", description: "Presentation verification and status checking." },
-  { key: "iproov", title: "iProov", description: "Liveness ceremony before the issuer releases credentials." },
+  { key: "iproov", title: "iProov", description: "Liveness ceremony before the verifier accepts the BBS+ disclosure." },
   { key: "relay", title: "Relay", description: "Local privacy relay showing the fetch path." },
   { key: "sdJwt", title: "SD-JWT", description: "Baseline selective disclosure with signed disclosures." },
   { key: "bbs", title: "BBS+", description: "Selective-disclosure proof revealing only one claim." },
@@ -28,10 +36,11 @@ const componentDefs = [
 ];
 
 let latestPayload = null;
+let currentUser = null;
 let iproovScriptPromise = null;
 
 async function fetchState() {
-  const response = await fetch(stateUrl);
+  const response = await apiFetch(stateUrl);
   if (!response.ok) {
     throw new Error(`Failed to load state: ${response.status}`);
   }
@@ -39,12 +48,24 @@ async function fetchState() {
   render();
 }
 
+async function fetchCurrentUser() {
+  const response = await apiFetch("/api/me");
+  if (!response.ok) {
+    throw new Error(`Failed to load account: ${response.status}`);
+  }
+  const payload = await response.json();
+  currentUser = payload.user || null;
+  renderAccount();
+}
+
 function render() {
   if (!latestPayload) return;
 
   const { steps, state } = latestPayload;
+  const scenarioSteps = buildScenarioSteps(steps);
+  renderAccount();
   renderComponents(state);
-  renderSteps(steps, state);
+  renderSteps(scenarioSteps, state);
   renderEvidence(state);
   renderLogs(state);
   renderRelay(state);
@@ -56,7 +77,30 @@ function render() {
     ? `Last error: ${state.lastError}`
     : state.busy
       ? `Running ${humanizeActivity(state)}...`
-      : "Ready. Run the next step, or use Hard Reset to rewind the booth to a clean start.";
+      : "Ready. Run the next step, or reset only your signed-in session.";
+}
+
+function buildScenarioSteps(steps) {
+  const ordered = [];
+  let inserted = false;
+
+  for (const step of steps) {
+    ordered.push(step);
+    if (step.id === "issue-sd-jwt") {
+      ordered.push(iproovScenarioStep);
+      inserted = true;
+    }
+  }
+
+  if (!inserted) ordered.push(iproovScenarioStep);
+  return ordered;
+}
+
+function renderAccount() {
+  if (!accountName || !accountEmail) return;
+  const fallbackName = currentUser?.mode === "open" ? "Local demo mode" : "Signed-in user";
+  accountName.textContent = currentUser?.name || currentUser?.email || fallbackName;
+  accountEmail.textContent = currentUser?.email || (currentUser?.mode === "open" ? "Authentication disabled" : "");
 }
 
 function renderComponents(state) {
@@ -104,7 +148,10 @@ function componentStatus(key, state) {
     if (state.iproov.status === "failed") {
       return { label: "Ceremony failed", className: "warning" };
     }
-    return { label: "Ready to launch", className: "" };
+    if (state.services.issuer.status !== "running" || state.services.verifier.status !== "running") {
+      return { label: "Waiting for issuer + verifier", className: "" };
+    }
+    return { label: "Ready for BBS+ disclosure", className: "" };
   }
   if (key === "sdJwt") {
     return state.artifacts.sdJwt
@@ -128,15 +175,29 @@ function componentStatus(key, state) {
 function renderSteps(steps, state) {
   stepList.innerHTML = "";
   for (const step of steps) {
+    const isIproovStep = step.id === iproovScenarioStep.id;
     const card = document.createElement("article");
-    const status = state.steps[step.id];
+    const status = isIproovStep ? iproovScenarioStatus(state) : state.steps[step.id];
     card.className = `step-card ${status}`;
     const button = document.createElement("button");
     button.className = "button button-primary";
     button.type = "button";
-    button.textContent = state.currentStepId === step.id && state.busy ? "Running..." : "Run Step";
-    button.disabled = state.busy;
-    button.addEventListener("click", () => runStep(step.id));
+    button.textContent = isIproovStep
+      ? iproovScenarioButtonLabel(state)
+      : state.currentStepId === step.id && state.busy
+        ? "Running..."
+        : "Run Step";
+    button.disabled = isIproovStep ? iproovScenarioDisabled(state) : state.busy;
+    button.addEventListener("click", () => {
+      if (isIproovStep) {
+        runIproovScenarioStep().catch((error) => {
+          console.error(error);
+          iproovBanner.textContent = error.message;
+        });
+        return;
+      }
+      runStep(step.id).catch((error) => console.error(error));
+    });
 
     card.innerHTML = `
       <header>
@@ -145,11 +206,51 @@ function renderSteps(steps, state) {
           <h3>${step.title}</h3>
         </div>
       </header>
-      <p>${step.summary}</p>
+      <p>${isIproovStep ? iproovScenarioSummary(state) : step.summary}</p>
     `;
     card.appendChild(button);
     stepList.appendChild(card);
   }
+}
+
+function iproovScenarioStatus(state) {
+  if (state.busy && !state.currentStepId) return "running";
+  if (state.iproov.status === "passed") return "completed";
+  if (state.iproov.status === "failed") return "failed";
+  if (state.iproov.status === "pending") return "running";
+  return "pending";
+}
+
+function iproovScenarioSummary(state) {
+  if (!state.iproov.realCeremonyEnabled) {
+    return "Real iProov credentials are not configured. This slot stays in the scenario order so Issue BBS+ still follows liveness, but the simulated callback path is used instead.";
+  }
+  if (state.iproov.status === "passed") {
+    return "Live iProov ceremony passed. Issue BBS+ can now send the selective-disclosure proof to the verifier.";
+  }
+  if (state.iproov.status === "pending" && state.iproov.session) {
+    return "An iProov session is open. Launch or resume the browser ceremony in the iProov workspace, then continue to Issue BBS+.";
+  }
+  return iproovScenarioStep.summary;
+}
+
+function iproovScenarioButtonLabel(state) {
+  if (!state.iproov.realCeremonyEnabled) return "Handled In BBS+";
+  if (state.busy && !state.currentStepId) return "Working...";
+  if (state.iproov.status === "passed") return "Completed";
+  if (state.iproov.status === "pending" && state.iproov.token) return "Launch Ceremony";
+  return "Start Ceremony";
+}
+
+function iproovScenarioDisabled(state) {
+  if (state.busy) return true;
+  if (!state.iproov.realCeremonyEnabled) return true;
+  if (state.iproov.status === "passed") return true;
+  return state.services.issuer.status !== "running" || state.services.verifier.status !== "running";
+}
+
+function shouldShowIproovWorkspace(state) {
+  return state.iproov.realCeremonyEnabled && state.iproov.status !== "idle";
 }
 
 function renderEvidence(state) {
@@ -200,17 +301,18 @@ function renderSnapshots(state) {
 
 function renderIproov(state) {
   const iproov = state.iproov;
-  const canStart = !state.busy && state.services.issuer.status === "running";
-  iproovStartButton.disabled = !canStart;
-  iproovStartButton.textContent = iproov.realCeremonyEnabled
-    ? iproov.status === "pending" && iproov.token
-      ? "Launch Ceremony"
-      : "Start Ceremony"
-    : "Use Simulated Gate";
+  const prerequisitesMet =
+    state.services.issuer.status === "running" && state.services.verifier.status === "running";
+  const showWorkspace = shouldShowIproovWorkspace(state);
+
+  iproovPanel?.classList.toggle("is-hidden", !showWorkspace);
+  if (!showWorkspace) return;
 
   iproovBanner.textContent = iproov.reason
     ? `iProov: ${iproov.reason}`
-    : iproov.note || "Start the issuer first, then launch the liveness ceremony.";
+    : prerequisitesMet
+      ? iproov.note || "Complete the iProov step before Issue BBS+."
+      : "Start the issuer and verifier before running the iProov step for Issue BBS+.";
 
   const metaLines = [
     `Mode: ${iproov.realCeremonyEnabled ? "real browser ceremony" : "simulated callback"}`,
@@ -221,7 +323,7 @@ function renderIproov(state) {
   iproovMeta.innerHTML = metaLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("");
 
   if (!iproov.realCeremonyEnabled) {
-    iproovMount.innerHTML = `<p class="iproov-placeholder">Real iProov credentials are not configured. The step flow will continue to use the simulated callback path.</p>`;
+    iproovMount.innerHTML = `<p class="iproov-placeholder">Real iProov credentials are not configured. The iProov step stays informational and the BBS+ flow continues with the simulated callback path.</p>`;
     return;
   }
 
@@ -231,7 +333,7 @@ function renderIproov(state) {
   }
 
   if (iproov.status === "idle" || !iproov.session) {
-    iproovMount.innerHTML = `<p class="iproov-placeholder">Press Start Ceremony to request a live iProov token and open the capture surface.</p>`;
+    iproovMount.innerHTML = `<p class="iproov-placeholder">Use the Complete iProov step to request a live token, then finish the browser ceremony here before Issue BBS+.</p>`;
   }
 }
 
@@ -270,7 +372,7 @@ function humanizeActivity(state) {
 }
 
 async function runStep(stepId) {
-  const response = await fetch(`/api/steps/${stepId}`, {
+  const response = await apiFetch(`/api/steps/${stepId}`, {
     method: "POST"
   });
   const payload = await response.json();
@@ -285,30 +387,18 @@ async function runStep(stepId) {
 
 async function hardResetDemo() {
   const shouldReset = window.confirm(
-    "Hard reset will stop the local services, clear the artifacts, and rewind the demo to step one."
+    "Reset your signed-in session and clear only your artifacts and progress?"
   );
   if (!shouldReset) return;
 
-  const response = await fetch("/api/reset", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({ force: true })
-  });
+  const response = await apiFetch("/api/reset", { method: "POST" });
   const payload = await response.json();
   latestPayload = { ...latestPayload, state: payload.state || latestPayload.state };
   render();
 }
 
 async function startIproovCeremony() {
-  const iproov = latestPayload?.state?.iproov;
-  if (iproov?.realCeremonyEnabled && iproov?.status === "pending" && iproov?.token) {
-    await launchIproovCeremony(iproov);
-    return;
-  }
-
-  const response = await fetch("/api/iproov/claim", { method: "POST" });
+  const response = await apiFetch("/api/iproov/claim", { method: "POST" });
   const payload = await response.json();
   latestPayload = { ...latestPayload, state: payload.state || latestPayload.state };
   render();
@@ -319,8 +409,19 @@ async function startIproovCeremony() {
 
   const nextIproov = latestPayload?.state?.iproov;
   if (nextIproov?.realCeremonyEnabled && nextIproov?.session && nextIproov?.token) {
+    focusIproovPanel();
     await launchIproovCeremony(nextIproov);
   }
+}
+
+async function runIproovScenarioStep() {
+  const iproov = latestPayload?.state?.iproov;
+  if (iproov?.realCeremonyEnabled && iproov.status === "pending" && iproov.session && iproov.token) {
+    focusIproovPanel();
+    await launchIproovCeremony(iproov);
+    return;
+  }
+  await startIproovCeremony();
 }
 
 async function launchIproovCeremony(iproov) {
@@ -339,22 +440,28 @@ async function launchIproovCeremony(iproov) {
   }, { once: true });
 
   ceremony.addEventListener("failed", (event) => {
-    iproovBanner.textContent = extractIproovEventMessage(event, "iProov reported a failed ceremony.");
+    const message = extractIproovEventMessage(event, "iProov reported a failed ceremony.");
+    iproovBanner.textContent = message;
+    expireIproovSession(message);
   });
 
   ceremony.addEventListener("error", (event) => {
-    iproovBanner.textContent = extractIproovEventMessage(event, "The iProov SDK reported an error.");
+    const message = extractIproovEventMessage(event, "The iProov SDK reported an error.");
+    iproovBanner.textContent = message;
+    expireIproovSession(message);
   });
 
   ceremony.addEventListener("canceled", () => {
-    iproovBanner.textContent = "The iProov ceremony was canceled.";
+    const message = "The iProov ceremony was canceled. Start a new session to try again.";
+    iproovBanner.textContent = message;
+    expireIproovSession(message);
   });
 
   iproovMount.appendChild(ceremony);
 }
 
 async function validateIproovCeremony() {
-  const response = await fetch("/api/iproov/validate", { method: "POST" });
+  const response = await apiFetch("/api/iproov/validate", { method: "POST" });
   const payload = await response.json();
   latestPayload = { ...latestPayload, state: payload.state || latestPayload.state };
   render();
@@ -381,6 +488,31 @@ function ensureIproovSdk(scriptUrl) {
   return iproovScriptPromise;
 }
 
+function focusIproovPanel() {
+  iproovPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function expireIproovSession(message) {
+  const state = latestPayload?.state;
+  const iproov = state?.iproov;
+  if (!state || !iproov) return;
+
+  latestPayload = {
+    ...latestPayload,
+    state: {
+      ...state,
+      iproov: {
+        ...iproov,
+        status: "failed",
+        token: null,
+        note: message || "The iProov session expired. Start a new ceremony to try again."
+      }
+    }
+  };
+
+  render();
+}
+
 function extractIproovEventMessage(event, fallback) {
   const detail = event?.detail;
   if (typeof detail?.message === "string" && detail.message) return detail.message;
@@ -389,11 +521,24 @@ function extractIproovEventMessage(event, fallback) {
   return fallback;
 }
 
+async function apiFetch(url, init) {
+  const response = await fetch(url, init);
+  if (response.status === 401) {
+    window.location.href = "/login";
+    throw new Error("Login required");
+  }
+  return response;
+}
+
+async function logout() {
+  await fetch("/auth/logout", { method: "POST" });
+  window.location.href = "/login";
+}
+
 resetButton.addEventListener("click", hardResetDemo);
-iproovStartButton.addEventListener("click", () => {
-  startIproovCeremony().catch((error) => {
-    console.error(error);
-    iproovBanner.textContent = error.message;
+logoutButton?.addEventListener("click", () => {
+  logout().catch((error) => {
+    statusBanner.textContent = error.message;
   });
 });
 
@@ -405,7 +550,7 @@ window.addEventListener("keydown", (event) => {
   });
 });
 
-fetchState().catch((error) => {
+Promise.all([fetchCurrentUser(), fetchState()]).catch((error) => {
   statusBanner.textContent = error.message;
 });
 

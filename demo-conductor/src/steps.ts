@@ -12,12 +12,12 @@ export const STEP_DEFS = [
   {
     id: 'issue-sd-jwt',
     title: 'Issue SD-JWT',
-    summary: 'Pass the iProov gate, mint a VC+SD-JWT credential, and verify it.'
+    summary: 'Mint a VC+SD-JWT credential and verify it.'
   },
   {
     id: 'issue-bbs',
     title: 'Issue BBS+',
-    summary: 'Mint a DI+BBS credential, derive a selective-disclosure proof, and verify it.'
+    summary: 'Mint a DI+BBS credential and verify the selective-disclosure proof.'
   },
   {
     id: 'enable-relay',
