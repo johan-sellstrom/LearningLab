@@ -24,6 +24,7 @@ import {
   renderIProovMobilePage
 } from './iproov-mobile.js'
 import { requestEnrolToken, resolveIProovConfig, validateEnrolToken } from './iproov.js'
+import { evaluateCredentialIssuanceIProovGate } from './lab-compat.js'
 
 dotenv.config()
 
@@ -38,6 +39,7 @@ const STATUS_LIST_ID = process.env.STATUS_LIST_ID || '1'
 const USE_OHTTP = String(process.env.USE_OHTTP || 'false') === 'true'
 const OHTTP_RELAY_URL = process.env.OHTTP_RELAY_URL || ''
 const IPROOV = resolveIProovConfig(process.env)
+const ACTIVE_LAB_ID = process.env.LAB_ID
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN?.trim()
 const STATUS_LIST_SIZE_BITS = Number(process.env.STATUS_LIST_SIZE_BITS || 8192)
 const STATUS_LIST_DIR = path.resolve(process.cwd(), '../status-list/data')
@@ -252,6 +254,7 @@ app.post('/credential', async (req: Request, res: Response) => {
       credential_configuration_id: z.string().optional(),
       subject: z.string().optional(),
       claims: z.record(z.any()).optional(),
+      iproov_session: z.string().optional(),
       proof: z
         .object({
           proof_type: z.string().optional(),
@@ -283,6 +286,20 @@ app.post('/credential', async (req: Request, res: Response) => {
     if (aud && aud !== BASE_URL && aud !== `${BASE_URL}/credential`) {
       return res.status(400).json({ error: 'invalid_proof', message: 'audience mismatch' })
     }
+  }
+
+  const iproovSession = body.iproov_session?.trim() || ''
+  const iproovSessionState = iproovSession ? iproovSessions.get(iproovSession) : null
+  const iproovDecision = evaluateCredentialIssuanceIProovGate({
+    labId: ACTIVE_LAB_ID,
+    providedSession: Boolean(iproovSession),
+    passedSession: iproovSessionState?.passed
+  })
+  if (!iproovDecision.allowed) {
+    return res.status(403).json({
+      error: iproovDecision.reason,
+      message: 'Complete the iProov ceremony before credential issuance'
+    })
   }
 
   const subject = body.subject || `did:example:${crypto.randomUUID()}`

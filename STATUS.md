@@ -123,7 +123,10 @@
 Lesson sweep results
 - Lab 00: pass
 - Lab 01: pass
-- Lab 02: fail because the verifier now requires an iProov session for BBS+ disclosure verification
+- Lab 02: pass
 - Lab 03: pass
-- Lab 04: fail because issuance is no longer blocked on iProov before `/credential`
+- Lab 04: pass
 - Lab 05: pass
+- [x] Add LAB_ID compatibility handling so Labs 02 and 04 still pass on the integrated branch
+- [x] Verify the lesson sweep after the compatibility fix
+- [x] Commit the lesson compatibility fix

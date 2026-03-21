@@ -488,6 +488,10 @@ async function startServices() {
   const env = { ...process.env }
   env.ISSUER_BASE_URL = DEFAULT_ISSUER
   env.VERIFIER_BASE_URL = DEFAULT_VERIFIER
+  env.LAB_ID = labId
+  env.ISSUER_JWKS_URL = `${DEFAULT_ISSUER}/.well-known/jwks.json`
+  env.BBS_KEY_URL = `${DEFAULT_ISSUER}/.well-known/bbs-public-key`
+  env.STATUS_LIST_URL = `${DEFAULT_ISSUER}/statuslist/${env.STATUS_LIST_ID || '1'}.json`
   // Provide stable defaults for labs that depend on admin/iproov tokens.
   env.ADMIN_TOKEN = env.ADMIN_TOKEN || 'lab-admin'
   env.IPROOV_PASS_TOKEN = env.IPROOV_PASS_TOKEN || 'demo-iproov-token'
