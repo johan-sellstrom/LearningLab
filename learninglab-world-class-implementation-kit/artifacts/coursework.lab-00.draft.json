@@ -1,0 +1,41 @@
+{
+  "mode": "dry-run",
+  "courseId": "162441988395",
+  "courseWork": {
+    "title": "Lab 00 — Start (Scaffolding + Health Checks)",
+    "description": "Get the scaffold running, env files in place, and verify the expected 501 stubs before coding.\n\n## What you should do\n1. Run `pnpm env:setup` and `pnpm install -r`.\n2. Start the services with `pnpm dev`.\n3. Verify the issuer metadata endpoint responds.\n4. Confirm the starter endpoints still return `501` until implemented.\n\n## Submission and grading\n- Work in your provisioned GitHub repository.\n- Push regularly; GitHub Actions is the grading signal.\n- Draft grades may appear before assigned grades are published.",
+    "workType": "ASSIGNMENT",
+    "state": "DRAFT",
+    "maxPoints": 100,
+    "materials": [
+      {
+        "link": {
+          "title": "Lab handout",
+          "url": "https://github.com/advatar/LearningLab/blob/main/labs/README-lab-00-start.md"
+        }
+      },
+      {
+        "link": {
+          "title": "GitHub Classroom assignment",
+          "url": "https://classroom.github.com/a/dWt8Cc5W"
+        }
+      },
+      {
+        "link": {
+          "title": "Starter repository",
+          "url": "https://github.com/advatarsystems/advatarsystems-learning-labs-beyond-compliance-privacy-first-digital-identity-LearningLab"
+        }
+      }
+    ],
+    "dueDate": {
+      "year": 2026,
+      "month": 9,
+      "day": 15
+    },
+    "dueTime": {
+      "hours": 21,
+      "minutes": 59,
+      "seconds": 0
+    }
+  }
+}

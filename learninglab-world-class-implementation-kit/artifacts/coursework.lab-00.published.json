@@ -1,0 +1,53 @@
+{
+  "courseId": "162441988395",
+  "id": "162442004708",
+  "title": "Lab 00 — Start (Scaffolding + Health Checks)",
+  "description": "Get the scaffold running, env files in place, and verify the expected 501 stubs before coding.\n\n## What you should do\n1. Run `pnpm env:setup` and `pnpm install -r`.\n2. Start the services with `pnpm dev`.\n3. Verify the issuer metadata endpoint responds.\n4. Confirm the starter endpoints still return `501` until implemented.\n\n## Submission and grading\n- Work in your provisioned GitHub repository.\n- Push regularly; GitHub Actions is the grading signal.\n- Draft grades may appear before assigned grades are published.",
+  "materials": [
+    {
+      "link": {
+        "url": "https://github.com/advatar/LearningLab/blob/main/labs/README-lab-00-start.md",
+        "title": "LearningLab/labs/README-lab-00-start.md at main · advatar/LearningLab · GitHub",
+        "thumbnailUrl": "https://classroom.google.com/webthumbnail?url=https://github.com/advatar/LearningLab/blob/main/labs/README-lab-00-start.md"
+      }
+    },
+    {
+      "link": {
+        "url": "https://classroom.github.com/a/dWt8Cc5W",
+        "title": "Sign in to GitHub · GitHub",
+        "thumbnailUrl": "https://classroom.google.com/webthumbnail?url=https://classroom.github.com/a/dWt8Cc5W"
+      }
+    },
+    {
+      "link": {
+        "url": "https://github.com/advatarsystems/advatarsystems-learning-labs-beyond-compliance-privacy-first-digital-identity-LearningLab",
+        "title": "GitHub - advatarsystems/advatarsystems-learning-labs-beyond-compliance-privacy-first-digital-identity-LearningLab: advatarsystems-learning-labs-beyond-compliance-privacy-first-digital-identity-LearningLab created by GitHub Classroom · GitHub",
+        "thumbnailUrl": "https://classroom.google.com/webthumbnail?url=https://github.com/advatarsystems/advatarsystems-learning-labs-beyond-compliance-privacy-first-digital-identity-LearningLab"
+      }
+    }
+  ],
+  "state": "PUBLISHED",
+  "alternateLink": "https://classroom.google.com/c/MTYyNDQxOTg4Mzk1/a/MTYyNDQyMDA0NzA4/details",
+  "creationTime": "2026-03-23T19:42:21.478Z",
+  "updateTime": "2026-03-23T19:43:57.218Z",
+  "dueDate": {
+    "year": 2026,
+    "month": 9,
+    "day": 15
+  },
+  "dueTime": {
+    "hours": 21,
+    "minutes": 59
+  },
+  "maxPoints": 100,
+  "workType": "ASSIGNMENT",
+  "submissionModificationMode": "MODIFIABLE_UNTIL_TURNED_IN",
+  "assignment": {
+    "studentWorkFolder": {
+      "id": "1ZkvemqAfE5mQN03WbJjNp3yBZgnjOBIekPpFygGNytlAXVbPoQl745OwK4s2U9Cwd7K4dq-d"
+    }
+  },
+  "associatedWithDeveloper": true,
+  "assigneeMode": "ALL_STUDENTS",
+  "creatorUserId": "114132396746948761962"
+}
