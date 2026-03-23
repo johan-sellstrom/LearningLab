@@ -162,3 +162,9 @@ Wallet verification notes
 - [x] Fix the `course-ops` Google client initialization bug surfaced during roster import
 - [x] Document the instructor-only persistent `course-ops` auth setup
 - [x] Verify the updated `course-ops` tests locally
+- [x] Confirm the authorized teacher account currently sees no Google Classroom courses via API
+- [x] Add a local-only Classroom course ID override for `course-ops`
+- [x] Document the local-only Classroom course ID override
+- [x] Verify `course-ops` after the Classroom course ID override
+- [ ] Supply the real Google Classroom course ID in the instructor-only local env
+- [ ] Verify Google roster import against the instructor course config once the real course ID is available

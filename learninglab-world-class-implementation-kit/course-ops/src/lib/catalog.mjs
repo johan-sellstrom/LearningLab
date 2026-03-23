@@ -3,6 +3,8 @@ import YAML from 'yaml'
 import { z } from 'zod'
 import { readText } from './fs.mjs'
 
+const courseIdPlaceholder = 'REPLACE_WITH_REAL_GOOGLE_CLASSROOM_COURSE_ID'
+
 const courseConfigSchema = z.object({
   course: z.object({
     name: z.string(),
@@ -69,7 +71,24 @@ export async function loadCourseConfig(configPath) {
   const text = await readText(configPath)
   const parsed = YAML.parse(text)
   const config = courseConfigSchema.parse(parsed)
-  return { ...config, __filePath: configPath, __baseDir: path.dirname(configPath) }
+  const courseIdOverride = String(process.env.GOOGLE_CLASSROOM_COURSE_ID || '').trim()
+  const effectiveCourseId = courseIdOverride || config.googleClassroom.courseId
+
+  if (!effectiveCourseId || effectiveCourseId === courseIdPlaceholder) {
+    throw new Error(
+      'Missing Google Classroom course ID; set googleClassroom.courseId in the course config or GOOGLE_CLASSROOM_COURSE_ID in your local env'
+    )
+  }
+
+  return {
+    ...config,
+    googleClassroom: {
+      ...config.googleClassroom,
+      courseId: effectiveCourseId
+    },
+    __filePath: configPath,
+    __baseDir: path.dirname(configPath)
+  }
 }
 
 export async function loadAssignment(assignmentPath) {
