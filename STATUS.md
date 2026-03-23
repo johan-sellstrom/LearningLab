@@ -174,7 +174,7 @@ Wallet verification notes
 - [x] Verify the updated `course-ops` tests and CLI flow locally
 - [x] Publish the Lab 00 Google Classroom coursework connected to the live GitHub Classroom assignment
 - [x] Fix the `course-ops` Google coursework patch mask so published-state updates work
-- [ ] Draft a Wednesday attendee quick-start that matches the live GitHub Classroom flow
-- [ ] Make GitHub Codespaces the explicit recommended student path in the student-facing docs
-- [ ] Verify the updated student docs and template sync locally
-- [ ] Commit the Wednesday quick-start updates
+- [x] Draft a Wednesday attendee quick-start that matches the live GitHub Classroom flow
+- [x] Make GitHub Codespaces the explicit recommended student path in the student-facing docs
+- [x] Verify the updated student docs and template sync locally
+- [x] Commit the Wednesday quick-start updates

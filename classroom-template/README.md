@@ -11,6 +11,17 @@ Monorepo implementing the architecture described in `DEMO.md`:
 - wallet-ios/ — Notes on integrating iProov & toggles in EUDI iOS wallet
 - wallet-android/ — Notes on integrating iProov & toggles in EUDI Android wallet
 
+## Wednesday attendee path
+
+If you are joining the in-person lab, do not start with a local install.
+
+1. Accept the GitHub Classroom invite shared by the instructors.
+2. Open your new repo in GitHub Codespaces.
+3. Follow [ATTENDEE_QUICKSTART.md](ATTENDEE_QUICKSTART.md).
+4. Start Lab 00 from [labs/README-lab-00-start.md](labs/README-lab-00-start.md).
+
+Google Classroom is optional for this repo. GitHub Classroom + Codespaces is the primary student path.
+
 ## Quickstart
 
 1) Bootstrap prerequisites + install dependencies
