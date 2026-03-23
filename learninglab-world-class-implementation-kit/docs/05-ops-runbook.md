@@ -28,6 +28,14 @@ node src/cli.mjs join-identities \
   --report-out ../artifacts/joined-roster.learninglab.report.json
 ```
 
+### Seed an editable GitHub identity CSV from the Google roster
+```bash
+node src/cli.mjs seed-identities \
+  --config ../catalog/course.config.example.yaml \
+  --google-roster ../artifacts/google-roster.learninglab.json \
+  --out ../artifacts/github-identities.learninglab.csv
+```
+
 ### Validate config
 ```bash
 node src/cli.mjs validate \
@@ -117,18 +125,32 @@ node src/cli.mjs sync-grades \
 
 ### Release
 1. import-google-roster
-2. join-identities
-3. validate
-4. plan
-5. provision-github dry-run
-6. provision-github apply
-7. progress
-8. advance-ready
-9. reconcile
-10. publish-google draft
-11. UI check in Classroom
-12. publish-google published or patch state
-13. monitor first workflows
+2. seed-identities when the cohort is in-person and GitHub usernames are not known ahead of time
+3. join-identities
+4. validate
+5. plan
+6. provision-github dry-run
+7. provision-github apply
+8. progress
+9. advance-ready
+10. reconcile
+11. publish-google draft
+12. UI check in Classroom
+13. publish-google published or patch state
+14. monitor first workflows
+
+## In-person / no-email Wednesday flow
+
+Use this when students will join live and you do not have their emails in advance.
+
+1. Create or reuse one GitHub Classroom assignment backed by the public template repo.
+2. Share the GitHub Classroom invite link in the room or inside Google Classroom.
+3. Ask students to join the Google Classroom course with the class code or invite link.
+4. Run `import-google-roster`.
+5. Run `seed-identities` to generate a CSV prefilled with Google student names, emails, and user IDs.
+6. Fill only the `github_username` column during class.
+7. Run `join-identities`.
+8. Use the existing GitHub Classroom helper scripts with the exported `accepted_assignments.csv` for `LAB_ID`, progress, and advancement operations.
 
 ### Grading
 1. progress identifies repos that have passed the current lab

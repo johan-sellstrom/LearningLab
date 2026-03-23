@@ -9,6 +9,7 @@ export function parseArgs(argv) {
     assignment: null,
     roster: null,
     googleRoster: null,
+    classroomCsv: null,
     identities: null,
     repoMap: null,
     progress: null,
@@ -37,6 +38,8 @@ export function parseArgs(argv) {
     else if (arg.startsWith('--roster=')) flags.roster = arg.split('=')[1]
     else if (arg === '--google-roster') flags.googleRoster = rest[++i]
     else if (arg.startsWith('--google-roster=')) flags.googleRoster = arg.split('=')[1]
+    else if (arg === '--classroom-csv') flags.classroomCsv = rest[++i]
+    else if (arg.startsWith('--classroom-csv=')) flags.classroomCsv = arg.split('=')[1]
     else if (arg === '--identities') flags.identities = rest[++i]
     else if (arg.startsWith('--identities=')) flags.identities = arg.split('=')[1]
     else if (arg === '--repo-map') flags.repoMap = rest[++i]
@@ -65,6 +68,7 @@ export function usage() {
   return `
 Usage:
   node src/cli.mjs import-google-roster --config <file> [--out <file>]
+  node src/cli.mjs seed-identities --config <file> --google-roster <file> [--out <file>]
   node src/cli.mjs join-identities --config <file> --google-roster <file> --identities <file> [--out <file>] [--report-out <file>]
   node src/cli.mjs validate --config <file> --assignment <file> [--roster <file>]
   node src/cli.mjs plan --config <file> --assignment <file> --roster <file> [--out <file>]

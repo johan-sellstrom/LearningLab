@@ -4,9 +4,10 @@ import './lib/env.mjs'
 
 import { parseArgs, usage } from './lib/args.mjs'
 import { loadCourseConfig, loadAssignment, buildRepoName, buildRepoDescription } from './lib/catalog.mjs'
-import { loadRoster, loadGitHubIdentities, renderRosterCsv } from './lib/csv.mjs'
+import { loadRoster, loadGitHubIdentities, renderRosterCsv, renderGitHubIdentityCsv } from './lib/csv.mjs'
 import { ensureDir, absoluteFrom, writeJson, writeText, readJson } from './lib/fs.mjs'
 import { renderCourseworkDescription, renderPlanMarkdown } from './lib/strings.mjs'
+import { buildCourseWorkPayload, readGitHubClassroomConfig } from './lib/coursework.mjs'
 import { planReadyAdvancement, summarizeAdvancementPlan } from './lib/advancement.mjs'
 import {
   createGitHubClient,
@@ -68,6 +69,9 @@ async function main() {
       return
     case 'join-identities':
       await handleJoinIdentities({ args, courseConfig })
+      return
+    case 'seed-identities':
+      await handleSeedIdentities({ args, courseConfig })
       return
     case 'validate':
       await handleValidate({ args, courseConfig, assignment })
@@ -196,6 +200,30 @@ async function handleJoinIdentities({ args, courseConfig }) {
   await writeText(out, renderRosterCsv(joinResult.matchedRoster))
   console.log(`[course-ops] wrote ${out}`)
   console.log(`[course-ops] wrote ${reportOut}`)
+}
+
+async function handleSeedIdentities({ args, courseConfig }) {
+  if (!args.googleRoster) throw new Error('--google-roster is required for seed-identities')
+
+  const googleRosterPath = path.resolve(args.googleRoster)
+  const googleRosterArtifact = await readJson(googleRosterPath)
+  const seededRows = (googleRosterArtifact.students || []).map((student) => ({
+    studentEmail: student.studentEmail,
+    githubUsername: '',
+    googleUserId: student.googleUserId || null,
+    studentName: student.studentName
+  }))
+
+  const out = args.out
+    ? path.resolve(args.out)
+    : path.resolve(
+      courseConfig.__baseDir,
+      courseConfig.paths.artifactsDir,
+      `github-identities.${courseConfig.googleClassroom.courseId}.csv`
+    )
+
+  await writeText(out, renderGitHubIdentityCsv(seededRows))
+  console.log(`[course-ops] wrote ${out}`)
 }
 
 async function handleValidate({ args, courseConfig, assignment }) {
@@ -604,7 +632,12 @@ async function handleReconcile({ args, courseConfig, assignment }) {
 
 async function handlePublishGoogle({ args, courseConfig, assignment }) {
   const state = args.state || assignment.googleClassroom.state || courseConfig.googleClassroom.defaultState
-  const courseWork = buildCourseWorkPayload({ courseConfig, assignment, state })
+  const courseWork = buildCourseWorkPayload({
+    courseConfig,
+    assignment,
+    state,
+    githubClassroom: readGitHubClassroomConfig()
+  })
 
   let result
   if (args.dryRun) {
@@ -636,7 +669,12 @@ async function handlePatchGoogle({ args, courseConfig, assignment }) {
   if (!courseWorkId) throw new Error('Could not determine courseWorkId')
 
   const state = args.state || assignment.googleClassroom.state || courseConfig.googleClassroom.defaultState
-  const courseWork = buildCourseWorkPayload({ courseConfig, assignment, state })
+  const courseWork = buildCourseWorkPayload({
+    courseConfig,
+    assignment,
+    state,
+    githubClassroom: readGitHubClassroomConfig()
+  })
   const out = args.out
     ? path.resolve(args.out)
     : path.resolve(courseConfig.__baseDir, courseConfig.paths.artifactsDir, `coursework.${assignment.id}.patch.json`)
@@ -662,34 +700,6 @@ async function handlePatchGoogle({ args, courseConfig, assignment }) {
 
   await writeJson(out, result)
   console.log(`[course-ops] wrote ${out}`)
-}
-
-function buildCourseWorkPayload({ courseConfig, assignment, state }) {
-  const courseWork = {
-    title: assignment.title,
-    description: renderCourseworkDescription(courseConfig, assignment),
-    workType: assignment.googleClassroom.workType,
-    state,
-    maxPoints: assignment.googleClassroom.maxPoints,
-    materials: (assignment.googleClassroom.materials || []).map((material) => ({
-      link: {
-        title: material.title,
-        url: material.url
-      }
-    }))
-  }
-
-  if (assignment.googleClassroom.dueDate) {
-    const [year, month, day] = assignment.googleClassroom.dueDate.split('-').map(Number)
-    courseWork.dueDate = { year, month, day }
-  }
-
-  if (assignment.googleClassroom.dueTime) {
-    const [hours, minutes, seconds = '0'] = assignment.googleClassroom.dueTime.split(':')
-    courseWork.dueTime = { hours: Number(hours), minutes: Number(minutes), seconds: Number(seconds) }
-  }
-
-  return courseWork
 }
 
 async function handleSyncGrades({ args, courseConfig, assignment }) {

@@ -55,6 +55,10 @@ GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 GOOGLE_REFRESH_TOKEN=...
 GOOGLE_CLASSROOM_COURSE_ID=...
+GITHUB_CLASSROOM_INVITE_URL=...
+GITHUB_CLASSROOM_ASSIGNMENT_TITLE=...
+GITHUB_CLASSROOM_STARTER_REPO_URL=...
+GITHUB_CLASSROOM_STARTER_REPO_TITLE=...
 ```
 
 The `refresh_token` is stored in `~/.config/gcloud/application_default_credentials.json` after the ADC login flow completes. If you do not want any secrets inside the repo checkout, store that env file elsewhere and run commands with `COURSE_OPS_ENV_FILE=/absolute/path/to/course-ops.env`.
@@ -88,6 +92,14 @@ node src/cli.mjs join-identities \
   --identities ../catalog/github-identities.sample.csv \
   --out ../artifacts/joined-roster.learninglab.csv \
   --report-out ../artifacts/joined-roster.learninglab.report.json
+```
+
+### Seed an editable GitHub identity CSV from the Google roster
+```bash
+node src/cli.mjs seed-identities \
+  --config ../catalog/course.config.example.yaml \
+  --google-roster ../artifacts/google-roster.learninglab.json \
+  --out ../artifacts/github-identities.learninglab.csv
 ```
 
 ### Validate
@@ -169,6 +181,8 @@ node src/cli.mjs sync-grades \
 ## Notes
 
 - The Google command paths assume one dedicated Google Cloud project and OAuth client for production course operations.
+- For an in-person cohort with no pre-collected emails, use GitHub Classroom for repo creation and `seed-identities` after students join the Google Classroom course. The generated CSV already contains the Google-side student emails and IDs; you only need to fill GitHub usernames.
+- If `GITHUB_CLASSROOM_INVITE_URL` is set in your local env, `publish-google` and `patch-google` append that invite link and the optional starter repo URL to the Google Classroom coursework materials.
 - `join-identities` fails closed when a Google Classroom student has no GitHub username match or when duplicate identity keys exist.
 - The GitHub commands assume the automation token can create repos from the template, set repo variables, add collaborators, and read workflow runs.
 - `progress` reads `LAB_ID` plus the latest workflow run to identify which repos are ready to advance.

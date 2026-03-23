@@ -95,6 +95,13 @@ The script will infer the lab ID from branch name (e.g., `lab-01-issuance` → `
 
 Branch-based detection is still supported, but `LAB_ID` should be the primary control plane.
 
+### In-person cohorts with no pre-collected emails
+
+- Share the assignment invite URL in the room instead of pre-inviting students by email.
+- Let GitHub Classroom create repos as students accept the invite with their GitHub accounts.
+- Use the Google Classroom roster plus `course-ops seed-identities` to capture GitHub usernames after students join the Google course.
+- Use the exported `accepted_assignments.csv` with `pnpm classroom:set-lab-id`, `pnpm classroom:progress`, and `pnpm classroom:advance`.
+
 ## 4) Set lab IDs
 
 - Recommended:

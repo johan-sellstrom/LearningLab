@@ -168,3 +168,8 @@ Wallet verification notes
 - [x] Verify `course-ops` after the Classroom course ID override
 - [x] Supply the real Google Classroom course ID in the instructor-only local env
 - [x] Verify Google roster import against the instructor course config once the real course ID is available
+- [x] Add a `course-ops` command that seeds a GitHub identity CSV from the Google Classroom roster
+- [x] Add local-only GitHub Classroom invite material support to Google coursework publishing
+- [x] Document the Wednesday in-person no-email GitHub Classroom flow
+- [x] Verify the updated `course-ops` tests and CLI flow locally
+- [x] Publish the Lab 00 Google Classroom coursework connected to the live GitHub Classroom assignment

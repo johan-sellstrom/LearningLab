@@ -68,6 +68,21 @@ export function renderRosterCsv(rows) {
     .concat('\n')
 }
 
+export function renderGitHubIdentityCsv(rows) {
+  const header = ['student_email', 'github_username', 'google_user_id', 'student_name']
+  const body = rows.map((row) => [
+    row.studentEmail,
+    row.githubUsername || '',
+    row.googleUserId || '',
+    row.studentName || ''
+  ])
+
+  return [header, ...body]
+    .map((cells) => cells.map(escapeCsvValue).join(','))
+    .join('\n')
+    .concat('\n')
+}
+
 function escapeCsvValue(value) {
   const text = String(value ?? '')
   if (/[,"\n]/.test(text)) {
