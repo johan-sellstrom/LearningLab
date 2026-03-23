@@ -14,9 +14,9 @@ Monorepo implementing the architecture described in `DEMO.md`:
 
 ## Start Here
 
-- Detailed lesson guide for students and instructors: [LESSON_RUNBOOK.md](/Users/johansellstrom/dev/iproov/RSA/LearningLab/LESSON_RUNBOOK.md)
-- Detailed mobile setup and testing guide: [STUDENT_WALLET_RUNBOOK.md](/Users/johansellstrom/dev/iproov/RSA/LearningLab/STUDENT_WALLET_RUNBOOK.md)
-- Mobile repo layout and fork policy: [WALLET_FORKS.md](/Users/johansellstrom/dev/iproov/RSA/LearningLab/WALLET_FORKS.md)
+- Detailed lesson guide for students and instructors: [LESSON_RUNBOOK.md](LESSON_RUNBOOK.md)
+- Detailed mobile setup and testing guide: [STUDENT_WALLET_RUNBOOK.md](STUDENT_WALLET_RUNBOOK.md)
+- Mobile repo layout and fork policy: [WALLET_FORKS.md](WALLET_FORKS.md)
 
 ## Public references
 
@@ -116,7 +116,7 @@ Containerized launch:
 
 Railway deployment:
 
-- the repo includes [railway.toml](/Users/johansellstrom/dev/iproov/RSA/LearningLab/railway.toml) for a single-service Railway deploy
+- the repo includes [railway.toml](railway.toml) for a single-service Railway deploy
 - Railway should run the conductor as the public web process while issuer/verifier stay inside the same container as child processes
 - the conductor now honors Railway's injected `PORT`
 - set `DEMO_CONDUCTOR_BASE_URL` to the public HTTPS origin when you enable Google login on Railway
@@ -143,13 +143,13 @@ Booth operation notes:
 The mobile wallet source stays in separate iOS and Android forks beside `LearningLab`. Do not add them as submodules and do not clone them inside this repo.
 
 - Setup helper: `node scripts/setup-wallet-forks.js`
-- Student/instructor workflow: [WALLET_FORKS.md](/Users/johansellstrom/dev/iproov/RSA/LearningLab/WALLET_FORKS.md)
-- Student mobile runbook: [STUDENT_WALLET_RUNBOOK.md](/Users/johansellstrom/dev/iproov/RSA/LearningLab/STUDENT_WALLET_RUNBOOK.md)
+- Student/instructor workflow: [WALLET_FORKS.md](WALLET_FORKS.md)
+- Student mobile runbook: [STUDENT_WALLET_RUNBOOK.md](STUDENT_WALLET_RUNBOOK.md)
 - Demo-flow guardrail: the browser-based `demo-conductor` path remains the existing demo path and must keep working even while wallet integrations evolve
 - iOS native path: use the official iProov iOS SDK on a physical iPhone when real iProov credentials are configured; keep the demo-mode callback fallback for simulator/lab work
 
 ## Lab tracks (step-by-step)
-- Zero-surprises classroom guide: [LESSON_RUNBOOK.md](/Users/johansellstrom/dev/iproov/RSA/LearningLab/LESSON_RUNBOOK.md)
+- Zero-surprises classroom guide: [LESSON_RUNBOOK.md](LESSON_RUNBOOK.md)
 - Lab 00: labs/README-lab-00-start.md
 - Lab 01: labs/README-lab-01-issuance.md
 - Lab 02: labs/README-lab-02-bbs.md

@@ -2,7 +2,7 @@
 
 The mobile wallet work lives in separate git repositories. Do not add the wallets to `LearningLab` as submodules and do not clone them inside this repo.
 
-Detailed student-facing setup and troubleshooting lives in [STUDENT_WALLET_RUNBOOK.md](/Users/johansellstrom/dev/iproov/RSA/LearningLab/STUDENT_WALLET_RUNBOOK.md). Use that file during class. This file explains the repo policy and the integration boundary.
+Detailed student-facing setup and troubleshooting lives in [STUDENT_WALLET_RUNBOOK.md](STUDENT_WALLET_RUNBOOK.md). Use that file during class. This file explains the repo policy and the integration boundary.
 
 Why:
 

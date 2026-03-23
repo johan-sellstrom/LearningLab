@@ -154,3 +154,6 @@ Wallet verification notes
 - [x] Add public reference links and summaries for the RSAC/session and Show & Tell sites to the root README
 - [x] Verify the repo build after the README reference update
 - [x] Commit the README reference update
+- [x] Replace absolute local markdown links with repo-relative links in the classroom docs
+- [x] Verify the repo build after the markdown link fix
+- [x] Commit the markdown link fix

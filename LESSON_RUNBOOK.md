@@ -2,7 +2,7 @@
 
 This is the classroom-facing guide for the current `LearningLab` repo. Use this file if you want one place that answers the questions students and TAs will otherwise keep asking.
 
-The per-lab branch handouts in [classroom-template/labs](/Users/johansellstrom/dev/iproov/RSA/LearningLab/classroom-template/labs) are still useful, but they describe the original branch-by-branch teaching model. This runbook explains how the current integrated `main` branch behaves, how `LAB_ID` changes that behavior for grading, and what a student is expected to do in each lesson.
+The per-lab branch handouts in [classroom-template/labs](classroom-template/labs) are still useful, but they describe the original branch-by-branch teaching model. This runbook explains how the current integrated `main` branch behaves, how `LAB_ID` changes that behavior for grading, and what a student is expected to do in each lesson.
 
 ## Non-Negotiable Rules
 
@@ -124,9 +124,9 @@ Goal:
 - confirm stubs or basic endpoints behave as expected
 
 Student focus:
-- read [issuer/src/index.ts](/Users/johansellstrom/dev/iproov/RSA/LearningLab/issuer/src/index.ts)
-- read [verifier/src/index.ts](/Users/johansellstrom/dev/iproov/RSA/LearningLab/verifier/src/index.ts)
-- read [bbs-lib/src/index.ts](/Users/johansellstrom/dev/iproov/RSA/LearningLab/bbs-lib/src/index.ts)
+- read [issuer/src/index.ts](issuer/src/index.ts)
+- read [verifier/src/index.ts](verifier/src/index.ts)
+- read [bbs-lib/src/index.ts](bbs-lib/src/index.ts)
 
 Commands:
 
@@ -153,8 +153,8 @@ Goal:
 - verify the resulting SD-JWT on the verifier
 
 Student edits:
-- [issuer/src/index.ts](/Users/johansellstrom/dev/iproov/RSA/LearningLab/issuer/src/index.ts)
-- [verifier/src/index.ts](/Users/johansellstrom/dev/iproov/RSA/LearningLab/verifier/src/index.ts)
+- [issuer/src/index.ts](issuer/src/index.ts)
+- [verifier/src/index.ts](verifier/src/index.ts)
 
 Student tasks:
 - implement `/credential-offers`
@@ -200,9 +200,9 @@ Goal:
 - derive and verify a selective disclosure proof
 
 Student edits:
-- [issuer/src/index.ts](/Users/johansellstrom/dev/iproov/RSA/LearningLab/issuer/src/index.ts)
-- [verifier/src/index.ts](/Users/johansellstrom/dev/iproov/RSA/LearningLab/verifier/src/index.ts)
-- [bbs-lib/src/index.ts](/Users/johansellstrom/dev/iproov/RSA/LearningLab/bbs-lib/src/index.ts)
+- [issuer/src/index.ts](issuer/src/index.ts)
+- [verifier/src/index.ts](verifier/src/index.ts)
+- [bbs-lib/src/index.ts](bbs-lib/src/index.ts)
 
 Student tasks:
 - add `AgeCredentialBBS` to issuer support
@@ -268,7 +268,7 @@ Goal:
 - add an iProov-backed liveness gate
 
 Student edits:
-- [issuer/src/index.ts](/Users/johansellstrom/dev/iproov/RSA/LearningLab/issuer/src/index.ts)
+- [issuer/src/index.ts](issuer/src/index.ts)
 - optionally wallet hook files for the advanced mobile track
 
 Student tasks:
@@ -301,9 +301,9 @@ Goal:
 - add revocation with a Bitstring Status List
 
 Student edits:
-- [issuer/src/index.ts](/Users/johansellstrom/dev/iproov/RSA/LearningLab/issuer/src/index.ts)
-- [verifier/src/index.ts](/Users/johansellstrom/dev/iproov/RSA/LearningLab/verifier/src/index.ts)
-- status list utilities under [status-list](/Users/johansellstrom/dev/iproov/RSA/LearningLab/status-list)
+- [issuer/src/index.ts](issuer/src/index.ts)
+- [verifier/src/index.ts](verifier/src/index.ts)
+- status list utilities under [status-list](status-list)
 
 Student tasks:
 - generate the status list file
@@ -351,4 +351,4 @@ Questions already answered:
   Because the booth demo uses the browser path while the mobile track uses the wallet path. They must coexist without breaking each other.
 
 - "Which files should a TA inspect first when a lesson fails?"
-  Start with [issuer/src/index.ts](/Users/johansellstrom/dev/iproov/RSA/LearningLab/issuer/src/index.ts), [verifier/src/index.ts](/Users/johansellstrom/dev/iproov/RSA/LearningLab/verifier/src/index.ts), and [scripts/lab-check.js](/Users/johansellstrom/dev/iproov/RSA/LearningLab/scripts/lab-check.js).
+  Start with [issuer/src/index.ts](issuer/src/index.ts), [verifier/src/index.ts](verifier/src/index.ts), and [scripts/lab-check.js](scripts/lab-check.js).

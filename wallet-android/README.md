@@ -2,7 +2,7 @@
 
 This folder contains notes for integrating the Beyond‑EUDI demo features into a fork of the EUDI Reference Wallet for Android.
 
-For classroom-facing setup, testing, and troubleshooting instructions, start with [STUDENT_WALLET_RUNBOOK.md](/Users/johansellstrom/dev/iproov/RSA/LearningLab/STUDENT_WALLET_RUNBOOK.md). This file is the engineering note, not the classroom handout.
+For classroom-facing setup, testing, and troubleshooting instructions, start with [STUDENT_WALLET_RUNBOOK.md](../STUDENT_WALLET_RUNBOOK.md). This file is the engineering note, not the classroom handout.
 
 - EUDI Android wallet: https://github.com/eu-digital-identity-wallet/eudi-app-android-wallet-ui
 - iProov Android SDK (docs + samples): https://github.com/iProov/android
