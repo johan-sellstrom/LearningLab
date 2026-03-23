@@ -178,3 +178,7 @@ Wallet verification notes
 - [x] Make GitHub Codespaces the explicit recommended student path in the student-facing docs
 - [x] Verify the updated student docs and template sync locally
 - [x] Commit the Wednesday quick-start updates
+- [ ] Add a local terminal fallback path to the attendee quick-start
+- [ ] Keep the source and student-template quick-start docs aligned
+- [ ] Verify the updated attendee docs locally
+- [ ] Commit the attendee quick-start terminal fallback
